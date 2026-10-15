@@ -1,0 +1,2503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>The Master of Pieces - 16-Bit Reseller Arcade</title>
+<style>
+  * {
+    box-sizing: border-box;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    margin: 0;
+    padding: 0;
+  }
+  body, html {
+    width: 100%;
+    height: 100dvh;
+    background-color: #08080c;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    font-family: 'Courier New', Courier, monospace;
+    touch-action: none;
+  }
+  #game-wrapper {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    max-width: 450px;
+    max-height: 820px;
+    aspect-ratio: 9 / 16;
+    background: #14141d;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border: 2px solid #eb7a24;
+    box-shadow: 0 0 28px rgba(235, 122, 36, 0.35);
+    overflow: hidden;
+  }
+  canvas {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    display: block;
+  }
+</style>
+</head>
+<body>
+
+<div id="game-wrapper">
+  <canvas id="gameCanvas" width="360" height="640"></canvas>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+
+let audioCtx = null;
+let soundMuted = false;
+
+function initAudio() {
+  if (!audioCtx) {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (AudioContextClass) audioCtx = new AudioContextClass();
+  }
+  if (audioCtx && audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+}
+
+function playSfx(type) {
+  if (!audioCtx || soundMuted) return;
+  try {
+    const now = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    if (type === 'smash') {
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(175, now);
+      osc.frequency.exponentialRampToValueAtTime(42, now + 0.13);
+      gain.gain.setValueAtTime(0.22, now);
+      gain.gain.linearRampToValueAtTime(0.01, now + 0.13);
+      osc.start(now);
+      osc.stop(now + 0.13);
+    } else if (type === 'card') {
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(540, now);
+      osc.frequency.exponentialRampToValueAtTime(1020, now + 0.08);
+      gain.gain.setValueAtTime(0.15, now);
+      gain.gain.linearRampToValueAtTime(0.01, now + 0.08);
+      osc.start(now);
+      osc.stop(now + 0.08);
+    } else if (type === 'pickup') {
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(587.33, now);
+      osc.frequency.setValueAtTime(880, now + 0.06);
+      gain.gain.setValueAtTime(0.15, now);
+      gain.gain.linearRampToValueAtTime(0.01, now + 0.15);
+      osc.start(now);
+      osc.stop(now + 0.15);
+    } else if (type === 'cashin') {
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(523.25, now);
+      osc.frequency.setValueAtTime(659.25, now + 0.07);
+      osc.frequency.setValueAtTime(783.99, now + 0.14);
+      osc.frequency.setValueAtTime(1046.50, now + 0.21);
+      gain.gain.setValueAtTime(0.2, now);
+      gain.gain.linearRampToValueAtTime(0.01, now + 0.38);
+      osc.start(now);
+      osc.stop(now + 0.38);
+    } else if (type === 'hit') {
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(120, now);
+      osc.frequency.linearRampToValueAtTime(52, now + 0.22);
+      gain.gain.setValueAtTime(0.25, now);
+      gain.gain.linearRampToValueAtTime(0.01, now + 0.22);
+      osc.start(now);
+      osc.stop(now + 0.22);
+    } else if (type === 'kerfuffle') {
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(95 + Math.random() * 150, now);
+      gain.gain.setValueAtTime(0.13, now);
+      gain.gain.linearRampToValueAtTime(0.01, now + 0.07);
+      osc.start(now);
+      osc.stop(now + 0.07);
+    }
+  } catch (err) {
+    // Ignore audio context errors on restricted browsers
+  }
+}
+
+// --- PRE-RENDERED LEVEL 1 SEGA GENESIS STREET TEXTURE BUFFER (360 x 256) ---
+const streetTileCanvas = document.createElement('canvas');
+streetTileCanvas.width = 360;
+streetTileCanvas.height = 256;
+
+function buildStreetTexture() {
+  const sctx = streetTileCanvas.getContext('2d');
+  sctx.imageSmoothingEnabled = false;
+
+  // Flagstone Sidewalk Base
+  sctx.fillStyle = "#495057";
+  sctx.fillRect(0, 0, 360, 256);
+
+  for (let y = 0; y < 256; y += 32) {
+    sctx.fillStyle = "#343a40";
+    sctx.fillRect(0, y, 72, 2);
+    sctx.fillRect(288, y, 72, 2);
+    const shift = (y / 32) % 2 === 0 ? 24 : 44;
+    sctx.fillRect(shift, y, 2, 32);
+    sctx.fillRect(288 + shift, y, 2, 32);
+    sctx.fillStyle = "#5c646d";
+    sctx.fillRect(2, y + 2, 66, 1);
+    sctx.fillRect(290, y + 2, 66, 1);
+  }
+
+  // Asphalt Roadway
+  sctx.fillStyle = "#242730";
+  sctx.fillRect(72, 0, 216, 256);
+
+  // Dithered Genesis Asphalt Texture
+  for (let y = 0; y < 256; y += 4) {
+    for (let x = 74; x < 284; x += 6) {
+      if ((x * 7 + y * 13) % 5 === 0) {
+        sctx.fillStyle = "#1c1e26";
+        sctx.fillRect(x, y, 2, 2);
+      } else if ((x * 11 + y * 3) % 9 === 0) {
+        sctx.fillStyle = "#2f3340";
+        sctx.fillRect(x, y, 2, 2);
+      }
+    }
+  }
+
+  // UK Double Yellow Kerb Lines
+  sctx.fillStyle = "#e6b800";
+  sctx.fillRect(76, 0, 2, 256);
+  sctx.fillRect(80, 0, 2, 256);
+  sctx.fillRect(282, 0, 2, 256);
+  sctx.fillRect(278, 0, 2, 256);
+
+  // 3D Beveled Granite Curbstones
+  for (let y = 0; y < 256; y += 16) {
+    sctx.fillStyle = (y / 16) % 2 === 0 ? "#868e96" : "#adb5bd";
+    sctx.fillRect(67, y, 6, 15);
+    sctx.fillRect(287, y, 6, 15);
+  }
+
+  // Manhole Cover & Storm Grates
+  sctx.fillStyle = "#3a3f4d";
+  sctx.beginPath();
+  sctx.arc(145, 96, 12, 0, Math.PI * 2);
+  sctx.fill();
+  sctx.strokeStyle = "#181a20";
+  sctx.lineWidth = 2;
+  sctx.stroke();
+
+  // Center Dashed White Line
+  for (let y = 10; y < 256; y += 48) {
+    sctx.fillStyle = "#dee2e6";
+    sctx.fillRect(178, y, 4, 24);
+  }
+}
+
+buildStreetTexture();
+
+// --- PRE-RENDERED LEVEL 2 CAR BOOT MUDDY GRASS FIELD BUFFER (360 x 256) ---
+const carBootTileCanvas = document.createElement('canvas');
+carBootTileCanvas.width = 360;
+carBootTileCanvas.height = 256;
+
+function buildCarBootFieldTexture() {
+  const cctx = carBootTileCanvas.getContext('2d');
+  cctx.imageSmoothingEnabled = false;
+
+  for (let y = 0; y < 256; y += 32) {
+    cctx.fillStyle = (y / 32) % 2 === 0 ? "#284f26" : "#2d572b";
+    cctx.fillRect(0, y, 360, 32);
+  }
+
+  // Muddy tyre ruts
+  cctx.fillStyle = "#4d3824";
+  cctx.fillRect(112, 0, 14, 256);
+  cctx.fillRect(234, 0, 14, 256);
+
+  const mudPatches = [
+    { x: 162, y: 48, w: 34, h: 18 },
+    { x: 140, y: 138, w: 42, h: 22 },
+    { x: 192, y: 204, w: 38, h: 16 }
+  ];
+  for (const mp of mudPatches) {
+    cctx.fillStyle = "#422f1d";
+    cctx.fillRect(mp.x, mp.y, mp.w, mp.h);
+    cctx.fillStyle = "#594028";
+    cctx.fillRect(mp.x + 4, mp.y + 3, mp.w - 8, mp.h - 6);
+  }
+
+  for (let y = 0; y < 256; y += 8) {
+    cctx.fillStyle = "rgba(255, 255, 255, 0.55)";
+    cctx.fillRect(68, y, 3, 5);
+    cctx.fillRect(289, y, 3, 5);
+  }
+}
+
+buildCarBootFieldTexture();
+
+// --- PRE-RENDERED LEVEL 3 CARDIFF CARD SHOW EXPO CARPET BUFFER (360 x 256) ---
+const cardShowTileCanvas = document.createElement('canvas');
+cardShowTileCanvas.width = 360;
+cardShowTileCanvas.height = 256;
+
+function buildCardShowCarpetTexture() {
+  const xctx = cardShowTileCanvas.getContext('2d');
+  xctx.imageSmoothingEnabled = false;
+
+  // Deep convention hall blue side carpet
+  xctx.fillStyle = "#162038";
+  xctx.fillRect(0, 0, 360, 256);
+
+  // Red VIP center aisle carpet
+  xctx.fillStyle = "#4a1525";
+  xctx.fillRect(72, 0, 216, 256);
+
+  // Gold aisle trim borders
+  xctx.fillStyle = "#d4af37";
+  xctx.fillRect(70, 0, 4, 256);
+  xctx.fillRect(286, 0, 4, 256);
+
+  // Patterned convention carpet diamonds
+  for (let y = 0; y < 256; y += 32) {
+    for (let x = 84; x < 276; x += 32) {
+      xctx.fillStyle = "#5e1b30";
+      xctx.fillRect(x + 12, y + 12, 8, 8);
+      xctx.fillStyle = "#d4af37";
+      xctx.fillRect(x + 15, y + 15, 2, 2);
+    }
+  }
+
+  // Booth divider tape on sides
+  for (let y = 0; y < 256; y += 64) {
+    xctx.fillStyle = "#2b3a5e";
+    xctx.fillRect(0, y, 70, 2);
+    xctx.fillRect(290, y, 70, 2);
+  }
+}
+
+buildCardShowCarpetTexture();
+
+// --- SIZABLE ITEM LIBRARY (Original Item Prices Restored) ---
+const ITEM_LIBRARY = [
+  { name: "G1 Soundwave Toy", val: 85, cat: "toy", color: "#2b4c8c", accent: "#d4af37" },
+  { name: "Brooks Running Shoes", val: 55, cat: "shoe", color: "#4a534e", accent: "#e85d3f" },
+  { name: "PS5 Ratchet & Clank", val: 38, cat: "game", color: "#003791", accent: "#ffffff" },
+  { name: "Cute Penguin Plush", val: 22, cat: "plush", color: "#22222b", accent: "#f59e42" },
+  { name: "Replica Mjolnir Hammer", val: 110, cat: "prop", color: "#8c969e", accent: "#523a28" },
+  { name: "Bauer Ice Skates", val: 65, cat: "shoe", color: "#1c1c21", accent: "#e0e0e0" },
+  { name: "Boxed Optimus Prime", val: 145, cat: "toy", color: "#c92a2a", accent: "#1971c2" },
+  { name: "Atomic Purple GameBoy", val: 75, cat: "console", color: "#7950f2", accent: "#adb5bd" },
+  { name: "SNES EarthBound Cart", val: 320, cat: "game", color: "#868e96", accent: "#e03131" },
+  { name: "PS1 Silent Hill CIB", val: 160, cat: "game", color: "#212529", accent: "#dee2e6" },
+  { name: "N64 GoldenEye Boxed", val: 68, cat: "game", color: "#343a40", accent: "#fcc419" },
+  { name: "Sega Dreamcast Unit", val: 95, cat: "console", color: "#f1f3f5", accent: "#f76707" },
+  { name: "GameCube Luigi Mansion", val: 62, cat: "game", color: "#5f3dc4", accent: "#40c057" },
+  { name: "Yellow Pikachu N64", val: 210, cat: "console", color: "#ffd43b", accent: "#228be6" },
+  { name: "1985 Air Jordan 1s", val: 290, cat: "shoe", color: "#e03131", accent: "#ffffff" },
+  { name: "Doc Martens 1460 Boots", val: 72, cat: "shoe", color: "#212529", accent: "#ffd43b" },
+  { name: "90s Nike Windbreaker", val: 48, cat: "clothing", color: "#15aabf", accent: "#e64980" },
+  { name: "Vintage Carhartt Jacket", val: 115, cat: "clothing", color: "#d9822b", accent: "#49321b" },
+  { name: "1998 Furby In Box", val: 58, cat: "plush", color: "#f06595", accent: "#ffffff" },
+  { name: "90s Tamagotchi Gen 1", val: 44, cat: "toy", color: "#4dabf7", accent: "#fcc419" },
+  { name: "Sony Walkman TPS-L2", val: 175, cat: "elec", color: "#1c7ed6", accent: "#ced4da" },
+  { name: "Bionicle Tahu Canister", val: 52, cat: "toy", color: "#f03e3e", accent: "#fd7e14" },
+  { name: "HeroQuest Board Game", val: 130, cat: "game", color: "#862e9c", accent: "#fcc419" },
+  { name: "1st Ed. Charizard Foil", val: 450, cat: "card", color: "#fd7e14", accent: "#ffe066" },
+  { name: "Lego Castle 6080", val: 195, cat: "toy", color: "#fab005", accent: "#adb5bd" },
+  { name: "80s My Little Pony", val: 34, cat: "plush", color: "#da77f2", accent: "#ffdeeb" },
+  { name: "Vintage Polaroid 600", val: 60, cat: "elec", color: "#343a40", accent: "#e03131" },
+  { name: "Subbuteo Floodlights", val: 40, cat: "toy", color: "#2b8a3e", accent: "#ffffff" }
+];
+
+// --- LEVEL 3: CARDIFF CARD SHOW NERD MEMORABILIA & GRADED SLABS ---
+const CARD_SHOW_LIBRARY = [
+  { name: "Graded 8 Hakan Sukur", val: 185, cat: "slab", color: "#e03131", accent: "#ffd43b" },
+  { name: "PSA 10 Base Charizard", val: 480, cat: "slab", color: "#fd7e14", accent: "#ffe066" },
+  { name: "Graded 9 Craig Bellamy", val: 145, cat: "slab", color: "#1971c2", accent: "#ffffff" },
+  { name: "1996 Panini Alan Shearer", val: 120, cat: "slab", color: "#212529", accent: "#ffffff" },
+  { name: "Signed Gareth Bale Shirt", val: 290, cat: "clothing", color: "#c92a2a", accent: "#2b8a3e" },
+  { name: "BGS 9.5 Black Lotus Proxy", val: 260, cat: "slab", color: "#5f3dc4", accent: "#fcc419" },
+  { name: "Warhammer 40k Rogue Trader", val: 175, cat: "game", color: "#862e9c", accent: "#f03e3e" },
+  { name: "1st Ed Shining Gyarados", val: 230, cat: "slab", color: "#c92a2a", accent: "#4dabf7" },
+  { name: "Panini Italia 90 Full Album", val: 195, cat: "game", color: "#2b8a3e", accent: "#ffd43b" },
+  { name: "Mint Blue-Eyes White Dragon", val: 240, cat: "slab", color: "#74c0fc", accent: "#dee2e6" },
+  { name: "Signed Terryban Funko Pop", val: 135, cat: "toy", color: "#f59f00", accent: "#212529" },
+  { name: "PSA 9 Japanese Lugia Neo", val: 310, cat: "slab", color: "#dee2e6", accent: "#1c7ed6" },
+  { name: "CGC 9.6 X-Men #1 Comic", val: 340, cat: "comic", color: "#1971c2", accent: "#ffd43b" },
+  { name: "Akira Vol. 1 1st Print Manga", val: 165, cat: "manga", color: "#e03131", accent: "#ffffff" },
+  { name: "Berserk Deluxe Vol. 1 Sealed", val: 140, cat: "manga", color: "#212529", accent: "#c92a2a" },
+  { name: "Evangelion Unit-01 Figure", val: 225, cat: "anime", color: "#7950f2", accent: "#51cf66" },
+  { name: "90s Sailor Moon Spiral Rod", val: 275, cat: "anime", color: "#f06595", accent: "#ffd43b" },
+  { name: "Goku Super Saiyan Resin", val: 295, cat: "anime", color: "#fd7e14", accent: "#ffe066" },
+  { name: "Amazing Spider-Man #300", val: 420, cat: "comic", color: "#212529", accent: "#ffffff" },
+  { name: "One Piece Vol. 1 JP Foil", val: 215, cat: "manga", color: "#f59f00", accent: "#1c7ed6" },
+  { name: "Attack on Titan ODM Hoodie", val: 115, cat: "merch", color: "#2b8a3e", accent: "#ced4da" },
+  { name: "Hatsune Miku Expo Glowstick", val: 95, cat: "merch", color: "#15aabf", accent: "#ffdeeb" }
+];
+
+// --- DEFECTS FOR KNOCK-OFF / DECOY ITEMS FROM BLUE IKEA BAGS ---
+const KNOCKOFF_DEFECTS = {
+  toy: ["BATTERY ACID CORROSION", "MISSING HEAD & LIMBS", "CHEAP PLASTIC BOOTLEG"],
+  shoe: ["FAKE BRAND KNOCK OFF", "SOLE COMPLETELY ROTTED", "TWO LEFT FEET IN BOX"],
+  game: ["EMPTY CASE - NO DISC!", "PIRATE ROM REPRO CART", "DEEP LASER BURN RING"],
+  console: ["RED RING / DEAD CAPACITORS", "FILLED WITH COCKROACHES", "BRICKED CLONE CONSOLE"],
+  plush: ["DAMP MOULDY STUFFING", "FAKE TAGS STAPLED ON", "CHEWED BY NEXT DOOR DOG"],
+  prop: ["HOLLOW FOAM PARTY PROP", "SNAPS IN HALF INSTANTLY"],
+  clothing: ["SNIDE MARKET TRANSFER", "MOTH HOLES EVERYWHERE", "SHRUNK TO DOLL SIZE"],
+  elec: ["CHEWED POWER LEAD", "RUSTED BATTERY COMPARTMENT"],
+  slab: ["FAKE CASE - GLUED PROXY", "TRIMMED EDGES REJECTED"],
+  manga: ["MISSING 40 PAGES!", "WATERLOGGED & UPSIDE DOWN"],
+  comic: ["COUPON CLIPPED OUT!", "REPRINT WITH FAKE BARCODE"],
+  anime: ["ALIEXPRESS BOOTLEG DERP FACE", "SNAPS OFF PLASTIC BASE"],
+  merch: ["PEELING VINYL TRANSFER", "UNOFFICIAL STALL BOOTLEG"]
+};
+
+const SUSPICIOUS_PICKUP_QUOTES = [
+  "NOT SURE THIS IS GENUINE...",
+  "SMELLS LIKE DAMP LOFT...",
+  "WAIT... SPELLED 'SONNY'?!",
+  "DODGY BLUE BAG FIND...",
+  "FEELS WAY TOO LIGHT...",
+  "HOPE BUYER DOESN'T NOTICE!"
+];
+
+const RESELLER_QUOTES = [
+  "THIS'LL GO ON VINTED!",
+  "PURE PROFIT MATE!",
+  "STRAIGHT ON EBAY!",
+  "EASY FLIP!",
+  "CHECK COMP SOLD PRICES!",
+  "MINT IN BOX!",
+  "BUNDLE & SAVE!",
+  "CAR BOOT TREASURE!",
+  "NO LOWBALLERS!",
+  "6 ITEMS -> £5000!"
+];
+
+const YOUTUBE_QUOTES = [
+  "WHATSUP EVERYBODY!",
+  "LIKE AND SUBSCRIBE!",
+  "SMASH THAT LIKE BUTTON!",
+  "WELCOME BACK TO THE SHED!",
+  "INSANE CHARITY SHOP HAUL!",
+  "LINK IN THE DESCRIPTION!",
+  "DON'T FORGET THE BELL!"
+];
+
+const RIVAL_QUOTES = [
+  "I SAW IT FIRST!",
+  "CHECKING TERAPEAK!",
+  "GIVE ME THAT!",
+  "£1 START NO RESERVE!"
+];
+
+// --- GAME STATE ---
+let gameState = 'TITLE'; // TITLE, PLAY, PC_ANIM, SHOP_RAID, LEVEL_SUMMARY, GAMEOVER
+let currentLevel = 1;    // 1: High Street, 2: Car Boot Sale, 3: Cardiff Card Show
+let timeRemaining = 60.0;
+let cashBanked = 100;
+let levelStartCash = 100;
+let levelScores = [0, 0, 0]; // Individual profit scored in L1, L2, L3
+let totalHaulSoldCount = 0;
+let ytSubscriberBonus = 0;
+let cameraY = 0;
+let lastSpawnY = -120;
+let screenShake = 0;
+let gameOverCooldown = 0;
+
+// Level Rank Thresholds (Non-cumulative per-level targets!)
+// L1: £15,000 | L2: £15,000 | L3: £25,000
+function getLevelTarget(lvl) {
+  if (lvl === 1) return 15000;
+  if (lvl === 2) return 15000;
+  return 25000;
+}
+
+function getRankForLevelScore(score, lvl) {
+  const topTarget = getLevelTarget(lvl);
+  if (score >= topTarget) return { title: "THE MASTER OF PIECES!", color: "#ffd43b" };
+  if (score >= topTarget * 0.7) return { title: "POWERSALES PLATINUM", color: "#51cf66" };
+  if (score >= topTarget * 0.45) return { title: "VINTED PRO FLIPPER", color: "#4dabf7" };
+  if (score >= topTarget * 0.2) return { title: "WEEKEND BARGAIN HUNTER", color: "#ff922b" };
+  return { title: "CAR BOOT ROOKIE", color: "#adb5bd" };
+}
+
+// Player Object
+const player = {
+  x: 180,
+  y: 0,
+  vx: 0,
+  vy: 0,
+  speed: 2.4,
+  dirX: 0,
+  dirY: -1,
+  bag: [],
+  maxBag: 12,
+  attackTimer: 0,
+  attackDirX: 0,
+  attackDirY: -1,
+  cardCooldown: 0,
+  invulnTimer: 0,
+  animFrame: 0,
+  nearBuilding: null,
+  inYoutubeZone: false
+};
+
+// World Collections
+let props = [];       // Breakable bins, boxes, crates, or stinky blue IKEA decoy bags
+let tables = [];      // Solid obstacle tables in Level 2 & Level 3
+let pickups = [];     // Dropped items on street
+let cards = [];       // Player thrown Pokemon cards
+let enemyCards = [];  // Enemy thrown cards in Level 3 Bullet Hell
+let enemies = [];     // Rival eBay resellers (10% looters, blue Car Boot bag droppers)
+let buildings = [];   // Charity shops (L1), Car Boots (L2), Vendor Booths (L3)
+let pcStations = [];  // PC selling desks
+let ytZones = [];     // YouTube filming zones
+let floatingTexts = [];
+let particles = [];
+
+// Active Cutscene States
+let pcCutscene = { minLock: 0, itemsSold: [], earned: 0, refunds: 0 };
+let shopRaid = { timer: 0, building: null, cost: 60 };
+
+// --- INPUT HANDLING ---
+const keys = {};
+window.addEventListener('keydown', e => {
+  keys[e.code] = true;
+  initAudio();
+  if (gameState === 'TITLE' && (e.code === 'Space' || e.code === 'Enter')) {
+    startNewCampaign();
+  } else if (gameState === 'PC_ANIM' && pcCutscene.minLock <= 0) {
+    if (['Space', 'Enter', 'KeyZ', 'KeyX', 'KeyC', 'KeyJ', 'KeyK', 'KeyL'].includes(e.code)) {
+      gameState = 'PLAY';
+    }
+  } else if (gameState === 'LEVEL_SUMMARY' && gameOverCooldown <= 0) {
+    if (['Space', 'Enter', 'KeyZ', 'KeyX', 'KeyC', 'KeyJ', 'KeyK', 'KeyL'].includes(e.code)) {
+      startLevel(currentLevel + 1);
+    }
+  } else if (gameState === 'GAMEOVER' && gameOverCooldown <= 0) {
+    if (['Space', 'Enter', 'KeyZ', 'KeyX', 'KeyC', 'KeyJ', 'KeyK', 'KeyL'].includes(e.code)) {
+      startNewCampaign();
+    }
+  }
+});
+window.addEventListener('keyup', e => { keys[e.code] = false; });
+
+const touchCtrl = {
+  joyOriginX: 78,
+  joyOriginY: 545,
+  joyX: 78,
+  joyY: 545,
+  dx: 0,
+  dy: 0,
+  smashPressed: false,
+  cardPressed: false,
+  actionPressed: false
+};
+
+function getCanvasCoords(clientX, clientY) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: (clientX - rect.left) * (canvas.width / rect.width),
+    y: (clientY - rect.top) * (canvas.height / rect.height)
+  };
+}
+
+function handlePointerAction(pos) {
+  initAudio();
+
+  if (gameState === 'TITLE') {
+    startNewCampaign();
+    return;
+  }
+  if (gameState === 'PC_ANIM') {
+    if (pcCutscene.minLock <= 0) gameState = 'PLAY';
+    return;
+  }
+  if (gameState === 'LEVEL_SUMMARY') {
+    if (gameOverCooldown <= 0) startLevel(currentLevel + 1);
+    return;
+  }
+  if (gameState === 'GAMEOVER') {
+    if (gameOverCooldown <= 0) startNewCampaign();
+    return;
+  }
+}
+
+function handleTouch(e) {
+  e.preventDefault();
+  initAudio();
+
+  if (e.type === 'touchstart' && e.changedTouches.length > 0) {
+    const pos = getCanvasCoords(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+    if (gameState !== 'PLAY') {
+      handlePointerAction(pos);
+      return;
+    }
+  }
+
+  touchCtrl.smashPressed = false;
+  touchCtrl.cardPressed = false;
+  touchCtrl.actionPressed = false;
+  let joyFound = false;
+
+  for (let i = 0; i < e.touches.length; i++) {
+    const t = e.touches[i];
+    const pos = getCanvasCoords(t.clientX, t.clientY);
+
+    if (pos.x < 175 && pos.y > 410) {
+      joyFound = true;
+      const distX = pos.x - touchCtrl.joyOriginX;
+      const distY = pos.y - touchCtrl.joyOriginY;
+      const dist = Math.hypot(distX, distY);
+      const maxR = 38;
+      if (dist > maxR) {
+        touchCtrl.joyX = touchCtrl.joyOriginX + (distX / dist) * maxR;
+        touchCtrl.joyY = touchCtrl.joyOriginY + (distY / dist) * maxR;
+      } else {
+        touchCtrl.joyX = pos.x;
+        touchCtrl.joyY = pos.y;
+      }
+      touchCtrl.dx = (touchCtrl.joyX - touchCtrl.joyOriginX) / maxR;
+      touchCtrl.dy = (touchCtrl.joyY - touchCtrl.joyOriginY) / maxR;
+    } else if (pos.y > 410) {
+      if (Math.hypot(pos.x - 230, pos.y - 562) < 56) touchCtrl.smashPressed = true;
+      if (Math.hypot(pos.x - 318, pos.y - 512) < 38) touchCtrl.cardPressed = true;
+      if (Math.hypot(pos.x - 270, pos.y - 450) < 36) touchCtrl.actionPressed = true;
+    }
+  }
+
+  if (!joyFound) {
+    touchCtrl.joyX = touchCtrl.joyOriginX;
+    touchCtrl.joyY = touchCtrl.joyOriginY;
+    touchCtrl.dx = 0;
+    touchCtrl.dy = 0;
+  }
+}
+
+canvas.addEventListener('touchstart', handleTouch, { passive: false });
+canvas.addEventListener('touchmove', handleTouch, { passive: false });
+canvas.addEventListener('touchend', handleTouch, { passive: false });
+
+let mouseJoyDragging = false;
+canvas.addEventListener('mousedown', e => {
+  const pos = getCanvasCoords(e.clientX, e.clientY);
+  if (gameState !== 'PLAY') {
+    handlePointerAction(pos);
+    return;
+  }
+  if (pos.x < 175 && pos.y > 410) {
+    mouseJoyDragging = true;
+  } else {
+    if (Math.hypot(pos.x - 230, pos.y - 562) < 56) doSmash();
+    if (Math.hypot(pos.x - 318, pos.y - 512) < 38) doThrowCard();
+    if (Math.hypot(pos.x - 270, pos.y - 450) < 36) doEnterBuilding();
+  }
+});
+
+window.addEventListener('mousemove', e => {
+  if (!mouseJoyDragging) return;
+  const pos = getCanvasCoords(e.clientX, e.clientY);
+  const distX = pos.x - touchCtrl.joyOriginX;
+  const distY = pos.y - touchCtrl.joyOriginY;
+  const dist = Math.hypot(distX, distY);
+  const maxR = 38;
+  if (dist > maxR) {
+    touchCtrl.joyX = touchCtrl.joyOriginX + (distX / dist) * maxR;
+    touchCtrl.joyY = touchCtrl.joyOriginY + (distY / dist) * maxR;
+  } else {
+    touchCtrl.joyX = pos.x;
+    touchCtrl.joyY = pos.y;
+  }
+  touchCtrl.dx = (touchCtrl.joyX - touchCtrl.joyOriginX) / maxR;
+  touchCtrl.dy = (touchCtrl.joyY - touchCtrl.joyOriginY) / maxR;
+});
+
+window.addEventListener('mouseup', () => {
+  if (mouseJoyDragging) {
+    mouseJoyDragging = false;
+    touchCtrl.joyX = touchCtrl.joyOriginX;
+    touchCtrl.joyY = touchCtrl.joyOriginY;
+    touchCtrl.dx = 0;
+    touchCtrl.dy = 0;
+  }
+});
+
+// --- CAMPAIGN & LEVEL MANAGEMENT ---
+function startNewCampaign() {
+  cashBanked = 120; // Starting float
+  levelScores = [0, 0, 0];
+  totalHaulSoldCount = 0;
+  ytSubscriberBonus = 0;
+  startLevel(1);
+}
+
+function startLevel(lvl) {
+  currentLevel = lvl;
+  gameState = 'PLAY';
+  timeRemaining = 60.0;
+  levelStartCash = cashBanked;
+
+  player.x = 180;
+  player.y = 0;
+  player.dirX = 0;
+  player.dirY = -1;
+  player.bag = [];
+  player.attackTimer = 0;
+  player.cardCooldown = 0;
+  player.invulnTimer = 0;
+  cameraY = -295;
+
+  props = [];
+  tables = [];
+  pickups = [];
+  cards = [];
+  enemyCards = [];
+  enemies = [];
+  buildings = [];
+  pcStations = [];
+  ytZones = [];
+  floatingTexts = [];
+  particles = [];
+
+  lastSpawnY = 80;
+  for (let y = 60; y > -650; y -= 92) {
+    spawnStreetRow(y);
+  }
+
+  const levelBanners = [
+    "L1: HIGH STREET HAUL!",
+    "L2: CAR BOOT SALE! WATCH BLUE BAGS!",
+    "L3: CARDIFF CARD SHOW!"
+  ];
+  addFloatingText(player.x, player.y - 35, levelBanners[currentLevel - 1], "#ffd43b", 85);
+}
+
+function pickRandomItemForLevel(isKnockoff = false, highTierOnly = false) {
+  const fullPool = currentLevel === 3 ? CARD_SHOW_LIBRARY : ITEM_LIBRARY;
+  let pool = fullPool;
+  if (highTierOnly && !isKnockoff) {
+    // Filter top-value grails for expensive Charity Shop / Boot / Booth raids!
+    const sorted = [...fullPool].sort((a, b) => b.val - a.val);
+    pool = sorted.slice(0, Math.max(5, Math.floor(sorted.length * 0.38)));
+  }
+  const base = pool[Math.floor(Math.random() * pool.length)];
+  if (!isKnockoff) {
+    return { ...base, isKnockoff: false, defect: null };
+  }
+  const defectPool = KNOCKOFF_DEFECTS[base.cat] || ["FAKE BRAND KNOCK OFF", "DAMAGED BEYOND REPAIR"];
+  const defect = defectPool[Math.floor(Math.random() * defectPool.length)];
+  // Refund penalty when cashed in at PC!
+  const refundPenalty = Math.round(base.val * 0.75);
+  return {
+    ...base,
+    val: -refundPenalty,
+    displayVal: base.val, // Looks valuable until listed!
+    isKnockoff: true,
+    defect: defect
+  };
+}
+
+function spawnStreetRow(y) {
+  lastSpawnY = y;
+
+  // Solid Obstacle Tables in Level 2 (Car Boot Pasting Tables) & Level 3 (Glass Card Tables)
+  if ((currentLevel === 2 || currentLevel === 3) && y < -40 && Math.random() < 0.72) {
+    const tx = 115 + Math.random() * 130;
+    tables.push({
+      x: tx,
+      y: y,
+      w: 52,
+      h: 24,
+      clothColor: currentLevel === 3 ? "#1864ab" : (Math.random() < 0.5 ? "#c92a2a" : "#2b8a3e")
+    });
+  }
+
+  // Breakable boxes, bins, crates
+  const propCount = 2 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < propCount; i++) {
+    const px = 88 + Math.random() * 184;
+    const py = y + (Math.random() * 40 - 20);
+    // Avoid overlapping solid tables
+    let overlapsTable = false;
+    for (const tb of tables) {
+      if (Math.abs(px - tb.x) < 36 && Math.abs(py - tb.y) < 24) overlapsTable = true;
+    }
+    if (overlapsTable) continue;
+
+    // In Level 2 Car Boot Sale, occasional pre-existing blue IKEA decoy bag on the pitch
+    const types = currentLevel === 2 && Math.random() < 0.18
+      ? ['ikea_bag']
+      : ['box', 'bin', 'crate', 'bag'];
+    props.push({
+      x: px,
+      y: py,
+      type: types[Math.floor(Math.random() * types.length)],
+      hp: 1
+    });
+  }
+
+  // Interactable Charity Shop (L1) / Car Boot (L2) / Vendor Booth (L3)
+  // Higher upfront cost, but yields guaranteed high-tier grail items!
+  if (Math.random() < 0.52) {
+    const side = Math.random() < 0.5 ? 'left' : 'right';
+    let shopNames, colors, raidCost;
+    if (currentLevel === 1) {
+      shopNames = ["TY CELYN THRIFT", "BARGAIN SHED", "HEART CHARITY", "RETRO HOSPICE", "CASH CONVERTER"];
+      colors = ["#9c36b5", "#2b8a3e", "#c92a2a", "#1864ab", "#d9480f"];
+      raidCost = 160;
+    } else if (currentLevel === 2) {
+      shopNames = ["ESTATE BOOT", "TRANSIT VAN", "VAUXHALL BOOT", "BERLINGO HAUL", "FORD ESCORT"];
+      colors = ["#1971c2", "#e03131", "#2f9e44", "#f08c00", "#5f3dc4"];
+      raidCost = 220;
+    } else {
+      shopNames = ["CYMRU SLABS", "DIFF GRAILS", "PANINI LEGENDS", "VALLEY TCG", "DRAGON MINT"];
+      colors = ["#d9480f", "#1864ab", "#5f3dc4", "#c92a2a", "#2b8a3e"];
+      raidCost = 350;
+    }
+    const idx = Math.floor(Math.random() * shopNames.length);
+    buildings.push({
+      x: side === 'left' ? 42 : 318,
+      doorX: side === 'left' ? 92 : 268,
+      y: y,
+      side: side,
+      name: shopNames[idx],
+      color: colors[idx],
+      raided: false,
+      lootedByEnemy: false,
+      shake: 0,
+      cost: raidCost
+    });
+  }
+
+  // PC Listing Station
+  if (Math.abs(y) % 270 < 92) {
+    pcStations.push({
+      x: Math.random() < 0.5 ? 102 : 258,
+      y: y - 25,
+      usedCooldown: 0
+    });
+  }
+
+  // YouTube Vlog Zone (High-reward Influencer Spot!)
+  if (Math.abs(y) % 340 < 92 && Math.abs(y) > 140) {
+    ytZones.push({
+      x: 180 + (Math.random() * 50 - 25),
+      y: y - 40,
+      radius: 44,
+      progress: 0,
+      completed: false,
+      quoteTimer: 0
+    });
+  }
+
+  // Rival eBay Resellers (10% chance to be a Looter rival!)
+  if (Math.random() < 0.78 && y < -80) {
+    const isLooter = Math.random() < 0.10;
+    const isBlueSeller = !isLooter && Math.random() < 0.55;
+    enemies.push({
+      x: 95 + Math.random() * 170,
+      y: y - 30,
+      vx: 0,
+      vy: 0,
+      hp: 2,
+      speed: isLooter ? 1.35 : (1.05 + Math.random() * 0.35),
+      isLooter: isLooter,
+      shirtColor: isLooter ? "#fcc419" : (isBlueSeller ? "#1971c2" : "#e03131"),
+      lootBag: [],
+      dropBagCooldown: 140 + Math.floor(Math.random() * 120),
+      shootCooldown: 70 + Math.floor(Math.random() * 60),
+      quoteTimer: Math.floor(Math.random() * 120)
+    });
+  }
+}
+
+// --- PLAYER ACTIONS ---
+function doSmash() {
+  if (gameState !== 'PLAY' || player.attackTimer > 0) return;
+  player.attackTimer = 14;
+  // Lock in the current movement/facing vector for the directional arm swing & hitbox
+  const mag = Math.hypot(player.dirX, player.dirY) || 1;
+  player.attackDirX = player.dirX / mag;
+  player.attackDirY = player.dirY / mag;
+  playSfx('smash');
+
+  const hitX = player.x + player.attackDirX * 24;
+  const hitY = (player.y - 10) + player.attackDirY * 24;
+
+  // Check breakable props (including stinky blue IKEA decoy bags)
+  for (let i = props.length - 1; i >= 0; i--) {
+    const p = props[i];
+    if (Math.hypot(p.x - hitX, p.y - hitY) < 36) {
+      const isIkeaDecoy = p.type === 'ikea_bag';
+      spawnParticles(p.x, p.y, isIkeaDecoy ? "#1971c2" : "#d9822b", 12);
+
+      if (isIkeaDecoy) {
+        addFloatingText(p.x, p.y - 22, "BLUE BAG BURST! SUSPICIOUS...", "#74c0fc", 55);
+      }
+
+      const dropCount = Math.random() < 0.3 ? 2 : 1;
+      for (let d = 0; d < dropCount; d++) {
+        const item = pickRandomItemForLevel(isIkeaDecoy);
+        pickups.push({
+          x: p.x + (Math.random() * 20 - 10),
+          y: p.y + (Math.random() * 16 - 8),
+          item: item,
+          bob: Math.random() * 6
+        });
+      }
+      props.splice(i, 1);
+    }
+  }
+
+  // Melee knockback against rivals along directional hitbox
+  for (let i = enemies.length - 1; i >= 0; i--) {
+    const e = enemies[i];
+    if (Math.hypot(e.x - hitX, (e.y - 10) - hitY) < 34) {
+      e.hp -= 1;
+      e.x += player.attackDirX * 16;
+      e.y += player.attackDirY * 16;
+      spawnParticles(e.x, e.y, "#ffffff", 6);
+      if (e.hp <= 0) defeatEnemy(i);
+    }
+  }
+}
+
+function doThrowCard() {
+  if (gameState !== 'PLAY' || player.cardCooldown > 0) return;
+  if (cashBanked < 1) {
+    addFloatingText(player.x, player.y - 28, "NO QUID FOR CARDS!", "#ff6b6b", 40);
+    return;
+  }
+
+  cashBanked -= 1; // Throwing a Pokemon card costs £1!
+  player.cardCooldown = 15;
+  playSfx('card');
+  addFloatingText(player.x + 12, player.y - 26, "-£1", "#ffd43b", 28);
+
+  let fwdX = player.dirX;
+  let fwdY = player.dirY;
+  const fwdLen = Math.hypot(fwdX, fwdY);
+  if (fwdLen > 0.001) {
+    fwdX /= fwdLen;
+    fwdY /= fwdLen;
+  } else {
+    fwdX = 0;
+    fwdY = -1;
+  }
+  let tx = fwdX;
+  let ty = fwdY;
+
+  // Soft auto-aim toward nearest rival ahead (cone of ~75 degrees in facing direction)
+  let bestDist = 165;
+  for (const e of enemies) {
+    const dx = e.x - player.x;
+    const dy = e.y - player.y;
+    const d = Math.hypot(dx, dy);
+    if (d > 0 && d < bestDist) {
+      const dot = (dx / d) * fwdX + (dy / d) * fwdY;
+      if (dot > 0.25) {
+        bestDist = d;
+        tx = dx / d;
+        ty = dy / d;
+      }
+    }
+  }
+
+  cards.push({
+    x: player.x,
+    y: player.y - 12,
+    vx: tx * 6.8,
+    vy: ty * 6.8,
+    angle: 0,
+    life: 46
+  });
+}
+
+function doEnterBuilding() {
+  if (gameState !== 'PLAY' || !player.nearBuilding) return;
+  const b = player.nearBuilding;
+  if (b.raided) return;
+
+  if (cashBanked < b.cost) {
+    addFloatingText(player.x, player.y - 25, `NEED £${b.cost} FLOAT!`, "#ff6b6b", 50);
+    playSfx('hit');
+    return;
+  }
+
+  cashBanked -= b.cost;
+  gameState = 'SHOP_RAID';
+  shopRaid.building = b;
+  shopRaid.timer = 90;
+  addFloatingText(b.doorX, b.y - 30, `-£${b.cost} BULK BUY!`, "#ff922b", 60);
+}
+
+function defeatEnemy(index) {
+  const e = enemies[index];
+  spawnParticles(e.x, e.y, "#ffd43b", 14);
+
+  if (e.isLooter && e.lootBag.length > 0) {
+    addFloatingText(e.x, e.y - 20, `LOOTER DROPPED ${e.lootBag.length} GRAILS!`, "#51cf66", 65);
+    for (const stolen of e.lootBag) {
+      pickups.push({
+        x: e.x + (Math.random() * 26 - 13),
+        y: e.y + (Math.random() * 20 - 10),
+        item: stolen,
+        bob: Math.random() * 5
+      });
+    }
+  } else if (currentLevel === 2 && e.shirtColor === "#1971c2") {
+    // Blue rivals in Car Boot Sale drop a stinky blue IKEA decoy bag when KO'd!
+    addFloatingText(e.x, e.y - 18, "DROPPED BLUE IKEA BAG!", "#74c0fc", 55);
+    props.push({
+      x: e.x,
+      y: e.y,
+      type: 'ikea_bag',
+      hp: 1
+    });
+  } else {
+    addFloatingText(e.x, e.y - 15, "SCALPER KO'D!", "#ffd43b", 45);
+    const item = pickRandomItemForLevel(false);
+    pickups.push({ x: e.x, y: e.y, item: item, bob: 0 });
+  }
+  enemies.splice(index, 1);
+}
+
+function addFloatingText(x, y, text, color = "#ffffff", duration = 55) {
+  floatingTexts.push({ x, y, text, color, timer: duration, maxTimer: duration });
+}
+
+function spawnParticles(x, y, color, count = 8) {
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x, y,
+      vx: (Math.random() - 0.5) * 4.5,
+      vy: (Math.random() - 0.5) * 4.5 - 1,
+      color,
+      life: 15 + Math.random() * 15
+    });
+  }
+}
+
+function resolveTableCollision(ent, radius = 12) {
+  for (const tb of tables) {
+    const halfW = tb.w / 2 + radius;
+    const halfH = tb.h / 2 + radius;
+    const dx = ent.x - tb.x;
+    const dy = ent.y - tb.y;
+    if (Math.abs(dx) < halfW && Math.abs(dy) < halfH) {
+      const overlapX = halfW - Math.abs(dx);
+      const overlapY = halfH - Math.abs(dy);
+      if (overlapX < overlapY) {
+        ent.x += dx > 0 ? overlapX : -overlapX;
+      } else {
+        ent.y += dy > 0 ? overlapY : -overlapY;
+      }
+    }
+  }
+}
+
+// --- MAIN UPDATE LOOP ---
+function update() {
+  if (screenShake > 0) screenShake--;
+
+  if (gameState === 'LEVEL_SUMMARY' || gameState === 'GAMEOVER') {
+    if (gameOverCooldown > 0) {
+      gameOverCooldown = Math.max(0, gameOverCooldown - 1 / 60);
+    }
+    return;
+  }
+
+  // Cutscene: PC Cash-In Graphic (lingers until button press after minLock)
+  if (gameState === 'PC_ANIM') {
+    if (pcCutscene.minLock > 0) pcCutscene.minLock--;
+    return;
+  }
+
+  // Cutscene: Charity Shop / Car Boot / Vendor Booth Raid
+  if (gameState === 'SHOP_RAID') {
+    shopRaid.timer--;
+    shopRaid.building.shake = 7;
+    screenShake = 4;
+
+    if (shopRaid.timer % 12 === 0) {
+      playSfx('kerfuffle');
+      const puffs = currentLevel === 2
+        ? ["*BOOT RUMMAGE*", "HOW MUCH THE BOX?!", "£5 THE LOT?!", "*TAILGATE SLAM*"]
+        : (currentLevel === 3
+          ? ["*SLAB HAGGLE*", "CHECK PSA POP!", "TRADE + CASH?!", "MINT CORNERS!"]
+          : ["*RUMMAGE*", "*HAGGLE!*", "£2 FOR ALL?!", "BUNDLE DEAL!"]);
+      const msg = puffs[Math.floor(Math.random() * puffs.length)];
+      addFloatingText(
+        shopRaid.building.x + (Math.random() * 40 - 20),
+        shopRaid.building.y - 25 + (Math.random() * 20 - 10),
+        msg, "#ffd43b", 35
+      );
+      spawnParticles(shopRaid.building.doorX, shopRaid.building.y, "#ffffff", 5);
+    }
+
+    if (shopRaid.timer <= 0) {
+      shopRaid.building.raided = true;
+      shopRaid.building.shake = 0;
+      gameState = 'PLAY';
+      playSfx('cashin');
+      let haulVal = 0;
+      // High upfront cost yields 5 guaranteed top-tier grails!
+      for (let i = 0; i < 5; i++) {
+        if (player.bag.length < player.maxBag) {
+          const item = pickRandomItemForLevel(false, true);
+          player.bag.push(item);
+          haulVal += item.val;
+        }
+      }
+      addFloatingText(player.x, player.y - 35, `PREMIUM HAUL! +5 GRAILS (£${haulVal} VAL!)`, "#51cf66", 80);
+    }
+    updateEffects();
+    return;
+  }
+
+  if (gameState !== 'PLAY') return;
+
+  // Countdown Timer (60s per Level)
+  timeRemaining -= 1 / 60;
+  if (timeRemaining <= 0) {
+    timeRemaining = 0;
+    // Record individual level profit
+    levelScores[currentLevel - 1] = Math.max(0, cashBanked - levelStartCash);
+    gameOverCooldown = 5.0; // 5-second safety lock
+    playSfx('cashin');
+    if (currentLevel < 3) {
+      gameState = 'LEVEL_SUMMARY';
+    } else {
+      gameState = 'GAMEOVER';
+    }
+    return;
+  }
+
+  // Movement Input
+  let mx = touchCtrl.dx;
+  let my = touchCtrl.dy;
+  if (keys['ArrowLeft'] || keys['KeyA']) mx = -1;
+  if (keys['ArrowRight'] || keys['KeyD']) mx = 1;
+  if (keys['ArrowUp'] || keys['KeyW']) my = -1;
+  if (keys['ArrowDown'] || keys['KeyS']) my = 1;
+
+  if (keys['KeyZ'] || keys['KeyJ']) doSmash();
+  if (keys['KeyX'] || keys['KeyK']) doThrowCard();
+  if (keys['KeyC'] || keys['KeyL'] || keys['Space'] || keys['Enter']) doEnterBuilding();
+  if (touchCtrl.smashPressed) doSmash();
+  if (touchCtrl.cardPressed) doThrowCard();
+  if (touchCtrl.actionPressed) doEnterBuilding();
+
+  const mag = Math.hypot(mx, my);
+  if (mag > 0.15) {
+    const normX = mx / Math.max(1, mag);
+    const normY = my / Math.max(1, mag);
+    player.x += normX * player.speed;
+    player.y += normY * player.speed;
+    player.dirX = normX;
+    player.dirY = normY;
+    player.animFrame += 0.22;
+  }
+
+  resolveTableCollision(player, 11);
+
+  // Street boundaries
+  player.x = Math.max(82, Math.min(278, player.x));
+  player.y = Math.min(cameraY + 340, player.y);
+
+  // Scroll Camera Upwards
+  const targetCamY = player.y - 295;
+  if (targetCamY < cameraY) {
+    cameraY += (targetCamY - cameraY) * 0.15;
+  }
+
+  // Generate new rows ahead
+  while (lastSpawnY > cameraY - 180) {
+    spawnStreetRow(lastSpawnY - 92);
+  }
+
+  if (player.attackTimer > 0) player.attackTimer--;
+  if (player.cardCooldown > 0) player.cardCooldown--;
+  if (player.invulnTimer > 0) player.invulnTimer--;
+
+  // Check proximity to Charity Shops / Car Boots / Booths
+  player.nearBuilding = null;
+  for (const b of buildings) {
+    if (!b.raided && Math.hypot(player.x - b.doorX, player.y - b.y) < 34) {
+      player.nearBuilding = b;
+      break;
+    }
+  }
+
+  // Check proximity to PC Listing Stations
+  for (const pc of pcStations) {
+    if (pc.usedCooldown > 0) pc.usedCooldown--;
+    if (player.bag.length > 0 && pc.usedCooldown === 0 && Math.hypot(player.x - pc.x, player.y - pc.y) < 28) {
+      let netEarned = 0;
+      let refundTotal = 0;
+      pcCutscene.itemsSold = [...player.bag];
+      for (const it of player.bag) {
+        netEarned += it.val;
+        if (it.isKnockoff) refundTotal += Math.abs(it.val);
+      }
+      pcCutscene.earned = netEarned;
+      pcCutscene.refunds = refundTotal;
+      cashBanked = Math.max(0, cashBanked + netEarned);
+      totalHaulSoldCount += player.bag.length;
+      player.bag = [];
+      pc.usedCooldown = 180;
+      pcCutscene.minLock = 20;
+      gameState = 'PC_ANIM';
+      playSfx(refundTotal > 0 ? 'hit' : 'cashin');
+      return;
+    }
+  }
+
+  // Check YouTube Influencer Zones (Earns ~£1,000 total per zone: 3x £100 superchats + £700 viral sponsor!)
+  player.inYoutubeZone = false;
+  for (const yz of ytZones) {
+    if (yz.completed) continue;
+    const d = Math.hypot(player.x - yz.x, player.y - yz.y);
+    if (d < yz.radius) {
+      player.inYoutubeZone = true;
+      const prevProg = yz.progress;
+      yz.progress += 0.85;
+      yz.quoteTimer++;
+
+      // Live Superchat stream ticks at 25%, 50%, 75% (£100 each = £300)
+      const tickReward = 100;
+      if (Math.floor(prevProg / 25) < Math.floor(yz.progress / 25) && yz.progress < 100) {
+        cashBanked += tickReward;
+        ytSubscriberBonus += tickReward;
+        addFloatingText(player.x, player.y - 44, `SUPERCHAT! +£${tickReward}`, "#51cf66", 40);
+      }
+
+      if (yz.quoteTimer % 36 === 1) {
+        const q = YOUTUBE_QUOTES[Math.floor(Math.random() * YOUTUBE_QUOTES.length)];
+        addFloatingText(player.x, player.y - 34, q, "#ff4d4d", 45);
+        playSfx('pickup');
+      }
+
+      if (Math.random() < 0.025 && enemies.length < 8) {
+        enemies.push({
+          x: Math.random() < 0.5 ? 90 : 270,
+          y: player.y - 130,
+          vx: 0,
+          vy: 0,
+          hp: 1,
+          speed: 1.5,
+          isLooter: Math.random() < 0.10,
+          shirtColor: "#f03e3e",
+          lootBag: [],
+          dropBagCooldown: 180,
+          shootCooldown: 55,
+          quoteTimer: 0
+        });
+      }
+
+      if (yz.progress >= 100) {
+        yz.completed = true;
+        // £700 Viral Completion Bonus (+ £300 Superchats = £1,000 total!)
+        const viralBonus = 700;
+        cashBanked += viralBonus;
+        ytSubscriberBonus += viralBonus;
+        playSfx('cashin');
+        spawnParticles(yz.x, yz.y, "#ff0000", 24);
+        addFloatingText(yz.x, yz.y - 28, `VIRAL VLOG! +£${viralBonus} (£1,000 TOTAL!)`, "#51cf66", 90);
+      }
+    }
+  }
+
+  // Pick up resellable items on street
+  for (let i = pickups.length - 1; i >= 0; i--) {
+    const p = pickups[i];
+    p.bob += 0.12;
+    if (Math.hypot(player.x - p.x, player.y - p.y) < 24) {
+      if (player.bag.length < player.maxBag) {
+        player.bag.push(p.item);
+        playSfx('pickup');
+        if (p.item.isKnockoff) {
+          const sus = SUSPICIOUS_PICKUP_QUOTES[Math.floor(Math.random() * SUSPICIOUS_PICKUP_QUOTES.length)];
+          addFloatingText(p.x, p.y - 18, `${p.item.name} (£${p.item.displayVal}?)`, "#74c0fc", 55);
+          addFloatingText(player.x, player.y - 32, `"${sus}"`, "#ff922b", 65);
+        } else {
+          const buzz = RESELLER_QUOTES[Math.floor(Math.random() * RESELLER_QUOTES.length)];
+          addFloatingText(p.x, p.y - 18, `${p.item.name} (£${p.item.val})`, "#51cf66", 55);
+          addFloatingText(player.x, player.y - 32, `"${buzz}"`, "#ffd43b", 55);
+        }
+        pickups.splice(i, 1);
+      } else {
+        addFloatingText(player.x, player.y - 24, "BAG FULL! FIND A PC!", "#ff6b6b", 35);
+      }
+    }
+  }
+
+  // Update player thrown Pokemon Cards
+  for (let i = cards.length - 1; i >= 0; i--) {
+    const c = cards[i];
+    c.x += c.vx;
+    c.y += c.vy;
+    c.angle += 0.35;
+    c.life--;
+
+    let hit = false;
+    for (let j = enemies.length - 1; j >= 0; j--) {
+      const e = enemies[j];
+      if (Math.hypot(c.x - e.x, c.y - (e.y - 10)) < 20) {
+        e.hp--;
+        spawnParticles(c.x, c.y, "#ffd43b", 7);
+        playSfx('smash');
+        if (e.hp <= 0) defeatEnemy(j);
+        hit = true;
+        break;
+      }
+    }
+    if (hit || c.life <= 0) cards.splice(i, 1);
+  }
+
+  // Update enemy thrown cards (Level 3 Bullet Hell)
+  for (let i = enemyCards.length - 1; i >= 0; i--) {
+    const ec = enemyCards[i];
+    ec.x += ec.vx;
+    ec.y += ec.vy;
+    ec.angle += 0.3;
+    ec.life--;
+
+    if (player.invulnTimer === 0 && Math.hypot(ec.x - player.x, ec.y - (player.y - 12)) < 15) {
+      player.invulnTimer = 45;
+      screenShake = 5;
+      playSfx('hit');
+      if (player.bag.length > 0) {
+        const lost = player.bag.pop();
+        addFloatingText(player.x, player.y - 28, `PAPER CUT! DROPPED ${lost.name}!`, "#ff4d4d", 55);
+      } else {
+        cashBanked = Math.max(0, cashBanked - 25);
+        addFloatingText(player.x, player.y - 28, "HIT BY COMMON CARD! -£25", "#ff4d4d", 50);
+      }
+      enemyCards.splice(i, 1);
+      continue;
+    }
+    if (ec.life <= 0) enemyCards.splice(i, 1);
+  }
+
+  // Update Rival eBay Resellers
+  for (let i = enemies.length - 1; i >= 0; i--) {
+    const e = enemies[i];
+    let targetX = player.x;
+    let targetY = player.y;
+
+    // 10% Looter Rival AI: Seeks out unraided shops, dropped items, or props!
+    if (e.isLooter) {
+      let foundTarget = false;
+      for (const pk of pickups) {
+        if (!pk.item.isKnockoff && Math.hypot(pk.x - e.x, pk.y - e.y) < 150) {
+          targetX = pk.x;
+          targetY = pk.y;
+          foundTarget = true;
+          if (Math.hypot(pk.x - e.x, pk.y - e.y) < 18) {
+            e.lootBag.push(pk.item);
+            addFloatingText(e.x, e.y - 24, "YOINK! MINE!", "#fcc419", 40);
+            pickups.splice(pickups.indexOf(pk), 1);
+          }
+          break;
+        }
+      }
+      if (!foundTarget) {
+        for (const b of buildings) {
+          if (!b.raided && Math.hypot(b.doorX - e.x, b.y - e.y) < 160) {
+            targetX = b.doorX;
+            targetY = b.y;
+            foundTarget = true;
+            if (Math.hypot(b.doorX - e.x, b.y - e.y) < 20) {
+              b.raided = true;
+              b.lootedByEnemy = true;
+              b.shake = 6;
+              e.lootBag.push(pickRandomItemForLevel(false), pickRandomItemForLevel(false));
+              addFloatingText(b.doorX, b.y - 30, "RIVAL LOOTED SHOP!", "#ff4d4d", 65);
+            }
+            break;
+          }
+        }
+      }
+      if (!foundTarget) {
+        for (let pi = props.length - 1; pi >= 0; pi--) {
+          const pr = props[pi];
+          if (pr.type !== 'ikea_bag' && Math.hypot(pr.x - e.x, pr.y - e.y) < 130) {
+            targetX = pr.x;
+            targetY = pr.y;
+            if (Math.hypot(pr.x - e.x, pr.y - e.y) < 20) {
+              spawnParticles(pr.x, pr.y, "#fcc419", 8);
+              e.lootBag.push(pickRandomItemForLevel(false));
+              addFloatingText(e.x, e.y - 22, "RIVAL SMASHED PROP!", "#fcc419", 40);
+              props.splice(pi, 1);
+            }
+            break;
+          }
+        }
+      }
+    }
+
+    const dx = targetX - e.x;
+    const dy = targetY - e.y;
+    const dist = Math.hypot(dx, dy);
+
+    if (dist < 260 && dist > 1) {
+      e.x += (dx / dist) * e.speed;
+      e.y += (dy / dist) * e.speed;
+    }
+
+    resolveTableCollision(e, 10);
+
+    // Level 2 Car Boot Sale: Blue rivals periodically drop stinky blue IKEA decoy bags!
+    if (currentLevel === 2 && e.shirtColor === "#1971c2") {
+      e.dropBagCooldown--;
+      if (e.dropBagCooldown <= 0 && dist < 210 && props.length < 28) {
+        e.dropBagCooldown = 190 + Math.floor(Math.random() * 90);
+        props.push({
+          x: e.x,
+          y: e.y + 8,
+          type: 'ikea_bag',
+          hp: 1
+        });
+        addFloatingText(e.x, e.y - 24, "*DROPS DODGY BLUE BAG*", "#74c0fc", 45);
+      }
+    }
+
+    // Level 3 Cardiff Card Show: Rivals throw bullet-hell spreads of cards!
+    if (currentLevel === 3) {
+      e.shootCooldown--;
+      const playerDist = Math.hypot(player.x - e.x, player.y - e.y);
+      if (e.shootCooldown <= 0 && playerDist < 220) {
+        e.shootCooldown = 85 + Math.floor(Math.random() * 50);
+        const baseAngle = Math.atan2(player.y - e.y, player.x - e.x);
+        const spread = [-0.22, 0, 0.22];
+        for (const s of spread) {
+          enemyCards.push({
+            x: e.x,
+            y: e.y - 12,
+            vx: Math.cos(baseAngle + s) * 3.2,
+            vy: Math.sin(baseAngle + s) * 3.2,
+            angle: 0,
+            life: 85
+          });
+        }
+      }
+    }
+
+    e.quoteTimer++;
+    if (e.quoteTimer % 160 === 0 && dist < 170) {
+      const rq = RIVAL_QUOTES[Math.floor(Math.random() * RIVAL_QUOTES.length)];
+      addFloatingText(e.x, e.y - 26, rq, "#ff8787", 45);
+    }
+
+    // Rival collides with player
+    const pDist = Math.hypot(player.x - e.x, player.y - e.y);
+    if (pDist < 18 && player.invulnTimer === 0) {
+      player.invulnTimer = 50;
+      screenShake = 6;
+      playSfx('hit');
+      if (player.bag.length > 0) {
+        const lost = player.bag.pop();
+        addFloatingText(player.x, player.y - 25, `RIVAL SNIPED ${lost.name}!`, "#ff4d4d", 60);
+      } else {
+        addFloatingText(player.x, player.y - 25, "OUCH! WATCH FOR SNIPERS!", "#ff4d4d", 50);
+      }
+      e.x -= ((player.x - e.x) / Math.max(1, pDist)) * 28;
+      e.y -= ((player.y - e.y) / Math.max(1, pDist)) * 28;
+    }
+  }
+
+  pruneOffscreenEntities();
+  updateEffects();
+}
+
+function pruneOffscreenEntities() {
+  const despawnY = cameraY + 700;
+  enemies = enemies.filter(e => e.y <= despawnY);
+  props = props.filter(p => p.y <= despawnY);
+  tables = tables.filter(t => t.y <= despawnY);
+  buildings = buildings.filter(b => b.y <= despawnY);
+  pcStations = pcStations.filter(pc => pc.y <= despawnY);
+  ytZones = ytZones.filter(yt => yt.y <= despawnY);
+  pickups = pickups.filter(pk => pk.y <= despawnY);
+}
+
+function updateEffects() {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const pt = particles[i];
+    pt.x += pt.vx;
+    pt.y += pt.vy;
+    pt.life--;
+    if (pt.life <= 0) particles.splice(i, 1);
+  }
+  for (let i = floatingTexts.length - 1; i >= 0; i--) {
+    const ft = floatingTexts[i];
+    ft.y -= 0.55;
+    ft.timer--;
+    if (ft.timer <= 0) floatingTexts.splice(i, 1);
+  }
+}
+
+// --- 16-BIT PIXEL ART RENDERING ---
+function drawMasterCharacter(x, y, scale = 1, isVlogging = false, attackTimer = 0) {
+  ctx.save();
+  ctx.translate(Math.floor(x), Math.floor(y));
+  ctx.scale(scale, scale);
+
+  const bob = Math.sin(player.animFrame) * 1.5;
+
+  // Drop Shadow
+  ctx.fillStyle = "rgba(0,0,0,0.48)";
+  ctx.fillRect(-10, -2, 20, 5);
+
+  // Legs / Jeans
+  const leftLeg = Math.sin(player.animFrame) * 3;
+  ctx.fillStyle = "#2b4c7e";
+  ctx.fillRect(-6, -9 + leftLeg * 0.4, 5, 8);
+  ctx.fillRect(1, -9 - leftLeg * 0.4, 5, 8);
+
+  // Brooks Running Trainers
+  ctx.fillStyle = "#3a403d";
+  ctx.fillRect(-7, -2 + leftLeg * 0.4, 6, 3);
+  ctx.fillRect(1, -2 - leftLeg * 0.4, 6, 3);
+  ctx.fillStyle = "#f76707";
+  ctx.fillRect(-7, 0 + leftLeg * 0.4, 6, 1);
+  ctx.fillRect(1, 0 - leftLeg * 0.4, 6, 1);
+
+  // Brown & Orange Two-Tone Winter Jacket
+  ctx.fillStyle = "#8a4b19";
+  ctx.fillRect(-9, -22 + bob, 18, 14);
+  ctx.fillStyle = "#d97324";
+  ctx.fillRect(-8, -21 + bob, 6, 6);
+  ctx.fillRect(2, -21 + bob, 6, 6);
+
+  // Dark Inner Hoodie Collar & Zipper
+  ctx.fillStyle = "#25282a";
+  ctx.fillRect(-4, -24 + bob, 8, 4);
+  ctx.fillRect(-1, -21 + bob, 2, 13);
+
+  // Head / Skin
+  ctx.fillStyle = "#f2c29b";
+  ctx.fillRect(-7, -34 + bob, 14, 11);
+
+  // Stubble Beard & Smile
+  ctx.fillStyle = "#9c7a5b";
+  ctx.fillRect(-6, -26 + bob, 12, 3);
+  ctx.fillStyle = "#5c3c24";
+  ctx.fillRect(-3, -25 + bob, 6, 1);
+
+  // Signature Black-Rimmed Glasses
+  ctx.fillStyle = "#141417";
+  ctx.fillRect(-7, -32 + bob, 6, 4);
+  ctx.fillRect(1, -32 + bob, 6, 4);
+  ctx.fillRect(-1, -31 + bob, 2, 1);
+  ctx.fillStyle = "#d0ebff";
+  ctx.fillRect(-5, -31 + bob, 3, 2);
+  ctx.fillRect(3, -31 + bob, 3, 2);
+
+  // Iconic Red/Black/White Bobble Beanie ("TY CELYN")
+  ctx.fillStyle = "#d92626";
+  ctx.fillRect(-8, -37 + bob, 16, 4);
+  ctx.fillStyle = "#ffffff";
+  for (let lx = -6; lx <= 5; lx += 3) {
+    ctx.fillRect(lx, -36 + bob, 2, 2);
+  }
+  ctx.fillStyle = "#18181c";
+  ctx.fillRect(-7, -40 + bob, 14, 3);
+  ctx.fillStyle = "#d92626";
+  ctx.fillRect(-6, -43 + bob, 12, 3);
+  ctx.fillStyle = "#d92626";
+  ctx.fillRect(-3, -47 + bob, 6, 4);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(-2, -46 + bob, 2, 2);
+  ctx.fillRect(1, -45 + bob, 2, 2);
+
+  // Directional Arms & Smash Animation!
+  ctx.fillStyle = "#b85d19";
+  if (attackTimer > 0) {
+    // Support resting arm
+    ctx.fillRect(-12, -21 + bob, 4, 9);
+
+    // Calculate directional punch vector (including slight diagonal tilt when moving mainly up/down)
+    let ax = player.attackDirX;
+    let ay = player.attackDirY;
+    if (Math.abs(ax) < 0.22) {
+      // Slight diagonal offset when punching mainly upwards or downwards so the swing is clearly visible
+      ax = ax >= 0 ? 0.28 : -0.28;
+    }
+    const angle = Math.atan2(ay, ax);
+
+    ctx.save();
+    ctx.translate(0, -18 + bob);
+    ctx.rotate(angle);
+    // Outstretched sleeve
+    ctx.fillStyle = "#d97324";
+    ctx.fillRect(4, -3, 13, 6);
+    // Fist
+    ctx.fillStyle = "#f2c29b";
+    ctx.fillRect(16, -4, 6, 8);
+    // White impact swing arc
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(21, -7, 4, 14);
+    ctx.restore();
+  } else if (isVlogging) {
+    ctx.fillRect(-12, -20 + bob, 4, 9);
+    ctx.fillRect(8, -23 + bob, 9, 4);
+    ctx.fillStyle = "#111115";
+    ctx.fillRect(15, -28 + bob, 6, 10);
+    ctx.fillStyle = "#4dabf7";
+    ctx.fillRect(16, -27 + bob, 4, 8);
+    if (Math.floor(Date.now() / 200) % 2 === 0) {
+      ctx.fillStyle = "#ff0000";
+      ctx.fillRect(17, -26 + bob, 2, 2);
+    }
+  } else {
+    ctx.fillRect(-12, -21 + bob, 4, 10);
+    ctx.fillRect(8, -21 + bob, 4, 10);
+  }
+
+  ctx.restore();
+}
+
+function drawRivalReseller(e) {
+  ctx.save();
+  ctx.translate(Math.floor(e.x), Math.floor(e.y));
+
+  ctx.fillStyle = "rgba(0,0,0,0.4)";
+  ctx.fillRect(-8, -2, 16, 4);
+
+  // Legs
+  ctx.fillStyle = "#212529";
+  ctx.fillRect(-5, -8, 4, 7);
+  ctx.fillRect(1, -8, 4, 7);
+
+  // Hoodie
+  ctx.fillStyle = e.shirtColor;
+  ctx.fillRect(-8, -20, 16, 12);
+
+  // Blue Car Boot rivals carry a rolled blue IKEA bag under their arm!
+  if (currentLevel === 2 && e.shirtColor === "#1971c2") {
+    ctx.fillStyle = "#0051ba";
+    ctx.fillRect(7, -18, 7, 9);
+    ctx.fillStyle = "#ffda1a";
+    ctx.fillRect(7, -19, 7, 2);
+  }
+
+  // Looter rivals carry a bulging swag sack
+  if (e.isLooter) {
+    ctx.fillStyle = "#0051ba";
+    ctx.fillRect(7, -21, 9, 12);
+    ctx.fillStyle = "#ffda1a";
+    ctx.fillRect(7, -21, 9, 3);
+    ctx.fillStyle = "#fcc419";
+    ctx.font = "bold 6px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("LOOTER", 0, -35);
+  }
+
+  // Phone out
+  ctx.fillStyle = "#ced4da";
+  ctx.fillRect(-11, -18, 4, 5);
+
+  // Head & Cap
+  ctx.fillStyle = "#e8b892";
+  ctx.fillRect(-6, -29, 12, 9);
+  ctx.fillStyle = "#111";
+  ctx.fillRect(-5, -27, 10, 3);
+  ctx.fillStyle = e.shirtColor;
+  ctx.fillRect(-7, -32, 14, 4);
+
+  ctx.restore();
+}
+
+function drawSolidTable(tb) {
+  ctx.save();
+  ctx.translate(Math.floor(tb.x), Math.floor(tb.y));
+
+  // Shadow
+  ctx.fillStyle = "rgba(0,0,0,0.45)";
+  ctx.fillRect(-tb.w / 2 - 2, -tb.h / 2 + 4, tb.w + 4, tb.h);
+
+  // Folding metal legs
+  ctx.fillStyle = "#343a40";
+  ctx.fillRect(-tb.w / 2 + 3, 2, 3, 8);
+  ctx.fillRect(tb.w / 2 - 6, 2, 3, 8);
+
+  // Tablecloth body
+  ctx.fillStyle = tb.clothColor;
+  ctx.fillRect(-tb.w / 2, -tb.h / 2, tb.w, tb.h);
+  ctx.fillStyle = "rgba(255,255,255,0.2)";
+  ctx.fillRect(-tb.w / 2, -tb.h / 2, tb.w, 4);
+
+  if (currentLevel === 3) {
+    // Glass Display Cases with Graded Slabs inside
+    ctx.fillStyle = "#a5d8ff";
+    ctx.fillRect(-tb.w / 2 + 4, -tb.h / 2 + 3, tb.w - 8, tb.h - 8);
+    ctx.fillStyle = "#e03131";
+    ctx.fillRect(-14, -8, 6, 8);
+    ctx.fillStyle = "#fab005";
+    ctx.fillRect(-3, -8, 6, 8);
+    ctx.fillStyle = "#1971c2";
+    ctx.fillRect(8, -8, 6, 8);
+  } else {
+    // Car Boot bric-a-brac on pasting table
+    ctx.fillStyle = "#ffd43b";
+    ctx.fillRect(-16, -9, 7, 6);
+    ctx.fillStyle = "#adb5bd";
+    ctx.fillRect(-2, -10, 9, 7);
+    ctx.fillStyle = "#f06595";
+    ctx.fillRect(11, -8, 6, 6);
+  }
+
+  ctx.restore();
+}
+
+function drawIsometricProp(p) {
+  ctx.save();
+  ctx.translate(Math.floor(p.x), Math.floor(p.y));
+
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
+  ctx.fillRect(-12, -2, 24, 6);
+
+  if (p.type === 'ikea_bag') {
+    // Blue Crinkly IKEA "FRAKTA" Decoy Bag with Yellow Straps & Green Stink Marks!
+    ctx.fillStyle = "#0051ba";
+    ctx.fillRect(-12, -15, 24, 13);
+    ctx.fillStyle = "#1971c2";
+    ctx.fillRect(-10, -17, 20, 4);
+    // Yellow handles
+    ctx.fillStyle = "#ffda1a";
+    ctx.fillRect(-9, -19, 4, 5);
+    ctx.fillRect(5, -19, 4, 5);
+    ctx.fillRect(-12, -15, 24, 2);
+
+    // Animated Wavy Green/Yellow Stink Lines & Flies (Mine Warning!)
+    const wave = Math.sin(Date.now() / 160) * 2.5;
+    ctx.strokeStyle = "#82c91e";
+    ctx.lineWidth = 1.5;
+    for (let sx = -7; sx <= 7; sx += 7) {
+      ctx.beginPath();
+      ctx.moveTo(sx, -20);
+      ctx.quadraticCurveTo(sx + wave, -26, sx - wave, -32);
+      ctx.stroke();
+    }
+    // Buzzing fly pixels
+    ctx.fillStyle = "#a9e34b";
+    ctx.fillRect(-9 + wave, -28, 2, 2);
+    ctx.fillRect(6 - wave, -25, 2, 2);
+  } else if (p.type === 'box') {
+    ctx.fillStyle = "#c28b4e";
+    ctx.fillRect(-11, -16, 22, 14);
+    ctx.fillStyle = "#e0ab70";
+    ctx.fillRect(-11, -20, 22, 5);
+    ctx.fillStyle = "#f8f9fa";
+    ctx.fillRect(-4, -12, 8, 5);
+  } else if (p.type === 'bin') {
+    ctx.fillStyle = "#2b5836";
+    ctx.fillRect(-9, -22, 18, 20);
+    ctx.fillStyle = "#3b7a4a";
+    ctx.fillRect(-11, -25, 22, 4);
+  } else if (p.type === 'crate') {
+    ctx.fillStyle = "#1c7ed6";
+    ctx.fillRect(-11, -15, 22, 13);
+    ctx.fillStyle = "#1864ab";
+    ctx.fillRect(-9, -13, 18, 3);
+    ctx.fillRect(-9, -8, 18, 3);
+  } else {
+    ctx.fillStyle = "#e64980";
+    ctx.fillRect(-9, -14, 18, 12);
+    ctx.fillStyle = "#f783ac";
+    ctx.fillRect(-4, -18, 8, 4);
+  }
+  ctx.restore();
+}
+
+function drawDetailedItemSprite(item, x, y) {
+  ctx.save();
+  ctx.translate(Math.floor(x), Math.floor(y));
+
+  if (item.cat === 'slab') {
+    // PSA Graded Slab Sprite
+    ctx.fillStyle = "#dee2e6";
+    ctx.fillRect(-7, -14, 14, 16);
+    ctx.fillStyle = "#e03131"; // Red PSA header label
+    ctx.fillRect(-6, -13, 12, 4);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(-5, -12, 10, 2);
+    ctx.fillStyle = item.color;
+    ctx.fillRect(-5, -8, 10, 8);
+    ctx.fillStyle = item.accent;
+    ctx.fillRect(-3, -6, 6, 4);
+  } else if (item.cat === 'comic' || item.cat === 'manga') {
+    // Bagged & Boarded Comic / Manga Tankobon Volume
+    ctx.fillStyle = "#f8f9fa";
+    ctx.fillRect(-7, -14, 14, 15);
+    ctx.fillStyle = item.color;
+    ctx.fillRect(-6, -13, 12, 13);
+    ctx.fillStyle = item.accent;
+    ctx.fillRect(-4, -11, 8, 4);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(-4, -5, 5, 4);
+  } else if (item.cat === 'anime' || item.cat === 'merch') {
+    // Windowed Anime Figure Box / Con Merch
+    ctx.fillStyle = item.color;
+    ctx.fillRect(-7, -14, 14, 14);
+    ctx.fillStyle = "#212529";
+    ctx.fillRect(-5, -12, 10, 8);
+    ctx.fillStyle = item.accent;
+    ctx.fillRect(-3, -10, 6, 6);
+  } else {
+    ctx.fillStyle = item.color;
+    ctx.fillRect(-6, -12, 12, 10);
+    ctx.fillStyle = item.accent;
+    ctx.fillRect(-4, -10, 8, 4);
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(-6.5, -12.5, 13, 11);
+  }
+
+  // Subtle green stink dot if it's a knock-off from a blue IKEA bag
+  if (item.isKnockoff) {
+    ctx.fillStyle = "#82c91e";
+    ctx.fillRect(4, -15, 3, 3);
+  }
+  ctx.restore();
+}
+
+function drawPickupItem(p) {
+  ctx.save();
+  const by = Math.sin(p.bob) * 3;
+  const px = Math.floor(p.x);
+  const py = Math.floor(p.y + by);
+
+  ctx.fillStyle = p.item.isKnockoff ? "rgba(130, 201, 30, 0.32)" : "rgba(255, 212, 59, 0.35)";
+  ctx.beginPath();
+  ctx.arc(px, py - 6, 10, 0, Math.PI * 2);
+  ctx.fill();
+
+  drawDetailedItemSprite(p.item, px, py);
+  ctx.restore();
+}
+
+function drawCharityBuilding(b) {
+  ctx.save();
+  const sx = b.shake > 0 ? (Math.random() - 0.5) * b.shake : 0;
+  const sy = b.shake > 0 ? (Math.random() - 0.5) * b.shake : 0;
+  ctx.translate(Math.floor(b.x + sx), Math.floor(b.y + sy));
+
+  const isLeft = b.side === 'left';
+  const bx = isLeft ? -44 : -24;
+
+  if (currentLevel === 2) {
+    // Level 2: Parked Car with Open Boot facing the field!
+    ctx.fillStyle = "rgba(0,0,0,0.45)";
+    ctx.fillRect(bx - 2, -40, 70, 42);
+    // Car Body
+    ctx.fillStyle = b.raided ? "#495057" : b.color;
+    ctx.fillRect(bx, -38, 66, 34);
+    // Roof & Windscreen
+    ctx.fillStyle = "#adb5bd";
+    ctx.fillRect(bx + 10, -34, 42, 26);
+    // Wheels
+    ctx.fillStyle = "#111";
+    ctx.fillRect(bx + 6, -6, 14, 6);
+    ctx.fillRect(bx + 46, -6, 14, 6);
+    // Open Tailgate facing pitch
+    const bootX = isLeft ? bx + 56 : bx - 6;
+    ctx.fillStyle = b.raided ? "#212529" : "#ffd43b";
+    ctx.fillRect(bootX, -34, 14, 28);
+  } else {
+    // Level 1 Charity Shop or Level 3 Vendor Booth
+    ctx.fillStyle = b.raided ? "#495057" : b.color;
+    ctx.fillRect(bx, -58, 68, 58);
+
+    ctx.fillStyle = "#212529";
+    ctx.fillRect(bx - 3, -68, 74, 12);
+
+    for (let i = 0; i < 6; i++) {
+      ctx.fillStyle = i % 2 === 0 ? "#f8f9fa" : (currentLevel === 3 ? "#fcc419" : "#e03131");
+      ctx.fillRect(bx + i * 11, -46, 11, 7);
+    }
+
+    const doorX = isLeft ? 8 : -20;
+    ctx.fillStyle = b.raided ? "#111" : "#ffd43b";
+    ctx.fillRect(doorX, -28, 12, 28);
+  }
+
+  // Signboard
+  ctx.fillStyle = "#111116";
+  ctx.fillRect(bx + 2, -57, 64, 10);
+  ctx.fillStyle = b.raided ? "#ff6b6b" : "#ffd43b";
+  ctx.font = "bold 6px monospace";
+  ctx.textAlign = "center";
+  const statusText = b.raided ? (b.lootedByEnemy ? "LOOTED!" : "SOLD OUT!") : b.name;
+  ctx.fillText(statusText, bx + 34, -50);
+
+  if (!b.raided && player.nearBuilding === b && gameState === 'PLAY') {
+    ctx.fillStyle = "#51cf66";
+    ctx.fillRect(bx + 4, -84, 60, 14);
+    ctx.fillStyle = "#000";
+    ctx.font = "bold 7px monospace";
+    const actionLabel = currentLevel === 2 ? `BOOT £${b.cost}` : `RAID £${b.cost}`;
+    ctx.fillText(actionLabel, bx + 34, -74);
+  }
+
+  ctx.restore();
+}
+
+function drawPCStation(pc) {
+  ctx.save();
+  ctx.translate(Math.floor(pc.x), Math.floor(pc.y));
+
+  ctx.fillStyle = "#5c3c24";
+  ctx.fillRect(-16, -12, 32, 12);
+  ctx.fillStyle = "#8a5a36";
+  ctx.fillRect(-18, -16, 36, 5);
+
+  ctx.fillStyle = "#ced4da";
+  ctx.fillRect(-10, -30, 20, 14);
+  ctx.fillStyle = pc.usedCooldown > 0 ? "#495057" : "#228be6";
+  ctx.fillRect(-8, -28, 16, 10);
+
+  if (pc.usedCooldown === 0) {
+    ctx.fillStyle = "#ffd43b";
+    ctx.font = "bold 7px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("SELL PC", 0, -34);
+  }
+
+  ctx.restore();
+}
+
+function drawYoutubeZone(yz) {
+  if (yz.completed) return;
+  ctx.save();
+  ctx.translate(Math.floor(yz.x), Math.floor(yz.y));
+
+  const pulse = Math.sin(Date.now() / 150) * 3;
+  ctx.strokeStyle = "#ff2a2a";
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, yz.radius + pulse, (yz.radius + pulse) * 0.6, 0, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.fillStyle = "rgba(255, 0, 0, 0.16)";
+  ctx.beginPath();
+  ctx.ellipse(0, 0, yz.radius, yz.radius * 0.6, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#ff0000";
+  ctx.fillRect(-34, -10, 68, 11);
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 7px monospace";
+  ctx.textAlign = "center";
+  ctx.fillText("VLOG SPOT £1000", 0, -2);
+
+  if (yz.progress > 0) {
+    ctx.fillStyle = "#111";
+    ctx.fillRect(-26, 4, 52, 6);
+    ctx.fillStyle = "#51cf66";
+    ctx.fillRect(-25, 5, (yz.progress / 100) * 50, 4);
+  }
+
+  ctx.restore();
+}
+
+// --- MAIN DRAW FUNCTION ---
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (gameState === 'TITLE') {
+    drawTitleScreen();
+    return;
+  }
+
+  ctx.save();
+  if (screenShake > 0) {
+    ctx.translate((Math.random() - 0.5) * screenShake, (Math.random() - 0.5) * screenShake);
+  }
+
+  drawLevelBackground();
+
+  ctx.save();
+  ctx.translate(0, -Math.floor(cameraY));
+
+  for (const yz of ytZones) {
+    if (yz.y > cameraY - 80 && yz.y < cameraY + 520) drawYoutubeZone(yz);
+  }
+  for (const pc of pcStations) {
+    if (pc.y > cameraY - 80 && pc.y < cameraY + 520) drawPCStation(pc);
+  }
+
+  const renderList = [];
+  for (const b of buildings) {
+    if (b.y > cameraY - 90 && b.y < cameraY + 520) {
+      renderList.push({ y: b.y, draw: () => drawCharityBuilding(b) });
+    }
+  }
+  for (const tb of tables) {
+    if (tb.y > cameraY - 60 && tb.y < cameraY + 500) {
+      renderList.push({ y: tb.y, draw: () => drawSolidTable(tb) });
+    }
+  }
+  for (const p of props) {
+    if (p.y > cameraY - 50 && p.y < cameraY + 500) {
+      renderList.push({ y: p.y, draw: () => drawIsometricProp(p) });
+    }
+  }
+  for (const pk of pickups) {
+    if (pk.y > cameraY - 50 && pk.y < cameraY + 500) {
+      renderList.push({ y: pk.y, draw: () => drawPickupItem(pk) });
+    }
+  }
+  for (const e of enemies) {
+    if (e.y > cameraY - 50 && e.y < cameraY + 500) {
+      renderList.push({ y: e.y, draw: () => drawRivalReseller(e) });
+    }
+  }
+  if (gameState !== 'SHOP_RAID') {
+    renderList.push({
+      y: player.y,
+      draw: () => {
+        if (player.invulnTimer % 4 < 2) {
+          drawMasterCharacter(player.x, player.y, 1, player.inYoutubeZone, player.attackTimer);
+        }
+      }
+    });
+  }
+
+  renderList.sort((a, b) => a.y - b.y);
+  for (const item of renderList) item.draw();
+
+  // Player Thrown Cards
+  for (const c of cards) {
+    ctx.save();
+    ctx.translate(c.x, c.y);
+    ctx.rotate(c.angle);
+    ctx.fillStyle = "#ffd43b";
+    ctx.fillRect(-5, -7, 10, 14);
+    ctx.fillStyle = "#228be6";
+    ctx.fillRect(-4, -6, 8, 12);
+    ctx.fillStyle = "#e03131";
+    ctx.fillRect(-2, -2, 4, 4);
+    ctx.restore();
+  }
+
+  // Enemy Thrown Cards (Level 3 Bullet Hell)
+  for (const ec of enemyCards) {
+    ctx.save();
+    ctx.translate(ec.x, ec.y);
+    ctx.rotate(ec.angle);
+    ctx.fillStyle = "#ff4d4d";
+    ctx.fillRect(-5, -7, 10, 14);
+    ctx.fillStyle = "#212529";
+    ctx.fillRect(-4, -6, 8, 12);
+    ctx.fillStyle = "#ffd43b";
+    ctx.fillRect(-2, -2, 4, 4);
+    ctx.restore();
+  }
+
+  for (const pt of particles) {
+    ctx.fillStyle = pt.color;
+    ctx.fillRect(pt.x, pt.y, 3, 3);
+  }
+
+  for (const ft of floatingTexts) {
+    ctx.save();
+    ctx.font = "bold 8px monospace";
+    const w = ctx.measureText(ft.text).width + 8;
+    ctx.fillStyle = "rgba(15, 15, 22, 0.88)";
+    ctx.fillRect(ft.x - w / 2, ft.y - 9, w, 12);
+    ctx.strokeStyle = ft.color;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(ft.x - w / 2, ft.y - 9, w, 12);
+    ctx.fillStyle = ft.color;
+    ctx.textAlign = "center";
+    ctx.fillText(ft.text, ft.x, ft.y);
+    ctx.restore();
+  }
+
+  ctx.restore();
+  ctx.restore();
+
+  drawHUD();
+  drawMobileControls();
+
+  if (gameState === 'PC_ANIM') {
+    drawPCCutscene();
+  } else if (gameState === 'LEVEL_SUMMARY' || gameState === 'GAMEOVER') {
+    drawSummaryScreen();
+  }
+}
+
+function drawLevelBackground() {
+  const tile = currentLevel === 1
+    ? streetTileCanvas
+    : (currentLevel === 2 ? carBootTileCanvas : cardShowTileCanvas);
+  const offset = Math.floor((-cameraY) % 256);
+  const startY = offset >= 0 ? offset - 256 : offset;
+  for (let y = startY; y < canvas.height; y += 256) {
+    ctx.drawImage(tile, 0, y);
+  }
+}
+
+function drawHUD() {
+  ctx.fillStyle = "rgba(14, 14, 20, 0.94)";
+  ctx.fillRect(0, 0, canvas.width, 56);
+  ctx.strokeStyle = "#eb7a24";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(0, 56);
+  ctx.lineTo(canvas.width, 56);
+  ctx.stroke();
+
+  const curLevelProfit = Math.max(0, cashBanked - levelStartCash);
+  ctx.fillStyle = "#51cf66";
+  ctx.font = "bold 14px monospace";
+  ctx.textAlign = "left";
+  ctx.fillText(`£${cashBanked}`, 10, 20);
+
+  ctx.fillStyle = "#adb5bd";
+  ctx.font = "bold 8px monospace";
+  ctx.fillText(`L${currentLevel} PROFIT: £${curLevelProfit}`, 10, 32);
+
+  let bagVal = 0;
+  for (const it of player.bag) {
+    bagVal += it.isKnockoff ? it.displayVal : it.val;
+  }
+  ctx.fillStyle = "#ffd43b";
+  ctx.font = "bold 9px monospace";
+  ctx.fillText(`BAG: ${player.bag.length}/${player.maxBag} (£${bagVal})`, 10, 46);
+
+  ctx.fillStyle = timeRemaining < 10 ? "#ff4d4d" : "#ffffff";
+  ctx.font = "bold 17px monospace";
+  ctx.textAlign = "center";
+  ctx.fillText(`${Math.ceil(timeRemaining)}s`, 180, 22);
+
+  const lvlTitles = ["L1: HIGH ST", "L2: CAR BOOT", "L3: CARD SHOW"];
+  ctx.fillStyle = "#eb7a24";
+  ctx.font = "bold 8px monospace";
+  ctx.fillText(lvlTitles[currentLevel - 1], 180, 35);
+  ctx.fillStyle = "#adb5bd";
+  ctx.fillText(`MASTER GOAL: £${getLevelTarget(currentLevel).toLocaleString()}`, 180, 47);
+
+  for (let i = 0; i < Math.min(player.bag.length, 5); i++) {
+    const it = player.bag[player.bag.length - 1 - i];
+    const ix = 338 - i * 16;
+    ctx.fillStyle = it.color;
+    ctx.fillRect(ix, 22, 12, 12);
+    ctx.fillStyle = it.accent;
+    ctx.fillRect(ix + 2, 24, 8, 5);
+    ctx.strokeStyle = it.isKnockoff ? "#82c91e" : "#fff";
+    ctx.strokeRect(ix, 22, 12, 12);
+  }
+}
+
+function drawMobileControls() {
+  ctx.fillStyle = "rgba(12, 12, 18, 0.55)";
+  ctx.fillRect(0, 420, canvas.width, 220);
+
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(touchCtrl.joyOriginX, touchCtrl.joyOriginY, 40, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.fillStyle = "rgba(235, 122, 36, 0.85)";
+  ctx.beginPath();
+  ctx.arc(touchCtrl.joyX, touchCtrl.joyY, 20, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(255, 255, 255, 0.55)";
+  ctx.font = "bold 7px monospace";
+  ctx.textAlign = "center";
+  ctx.fillText("WASD / ARROWS", touchCtrl.joyOriginX, touchCtrl.joyOriginY + 52);
+
+  // Oversized Primary SMASH Button
+  ctx.fillStyle = touchCtrl.smashPressed ? "#ff922b" : "#e03131";
+  ctx.beginPath();
+  ctx.arc(230, 562, 46, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#fff";
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 13px monospace";
+  ctx.textAlign = "center";
+  ctx.fillText("SMASH!", 230, 560);
+  ctx.fillStyle = "#ffd43b";
+  ctx.font = "bold 8.5px monospace";
+  ctx.fillText("[Z / J]", 230, 575);
+
+  // POKEMON CARD Button (-£1)
+  ctx.fillStyle = touchCtrl.cardPressed ? "#74c0fc" : "#1971c2";
+  ctx.beginPath();
+  ctx.arc(318, 512, 30, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#ffd43b";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.fillStyle = "#ffd43b";
+  ctx.font = "bold 9px monospace";
+  ctx.fillText("CARD -£1", 318, 510);
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 7px monospace";
+  ctx.fillText("[X / K]", 318, 521);
+
+  // SHOP / BOOT / BOOTH RAID Button
+  const canRaid = player.nearBuilding && !player.nearBuilding.raided && cashBanked >= player.nearBuilding.cost;
+  ctx.fillStyle = canRaid ? "#2f9e44" : "rgba(73, 80, 87, 0.65)";
+  ctx.beginPath();
+  ctx.arc(270, 450, 26, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = canRaid ? "#51cf66" : "#868e96";
+  ctx.stroke();
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 8px monospace";
+  ctx.fillText(currentLevel === 2 ? "BOOT" : "RAID", 270, 446);
+  ctx.fillStyle = "#ffd43b";
+  ctx.font = "bold 6.5px monospace";
+  ctx.fillText("[C/SPACE]", 270, 457);
+}
+
+// PC Listing Cutscene with RED Knock-Off Defect Refund Warnings!
+function drawPCCutscene() {
+  ctx.fillStyle = "rgba(0, 0, 0, 0.86)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = "#ced4da";
+  ctx.fillRect(16, 68, 328, 495);
+  ctx.fillStyle = "#111b2e";
+  ctx.fillRect(26, 80, 308, 470);
+
+  ctx.fillStyle = "#ffd43b";
+  ctx.fillRect(26, 80, 308, 26);
+  ctx.fillStyle = "#111";
+  ctx.font = "bold 11px monospace";
+  ctx.textAlign = "center";
+  ctx.fillText("VINTED / EBAY BULK LISTER!", 180, 97);
+
+  drawMasterCharacter(78, 175, 1.35, false, 0);
+
+  ctx.strokeStyle = "#ff2a2a";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(110, 160);
+  ctx.quadraticCurveTo(155, 180, 198, 148);
+  ctx.stroke();
+
+  const isNetPositive = pcCutscene.earned >= 0;
+  ctx.fillStyle = isNetPositive ? "#2b8a3e" : "#c92a2a";
+  ctx.fillRect(205, 122, 114, 48);
+  ctx.strokeStyle = "#fff";
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(205, 122, 114, 48);
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 15px monospace";
+  const sign = pcCutscene.earned >= 0 ? "+" : "";
+  ctx.fillText(`${sign}£${pcCutscene.earned}`, 262, 145);
+  if (pcCutscene.refunds > 0) {
+    ctx.fillStyle = "#ffc9c9";
+    ctx.font = "bold 8px monospace";
+    ctx.fillText(`(-£${pcCutscene.refunds} REFUNDS!)`, 262, 161);
+  }
+
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 9px monospace";
+  ctx.textAlign = "left";
+  ctx.fillText("ITEMIZED SALES & BUYER DISPUTES:", 36, 198);
+
+  const maxShow = Math.min(pcCutscene.itemsSold.length, 9);
+  for (let i = 0; i < maxShow; i++) {
+    const it = pcCutscene.itemsSold[i];
+    const rowY = 216 + i * 28;
+
+    ctx.fillStyle = it.isKnockoff ? "rgba(201, 42, 42, 0.28)" : "rgba(43, 138, 62, 0.2)";
+    ctx.fillRect(34, rowY - 11, 292, 25);
+
+    if (it.isKnockoff) {
+      ctx.fillStyle = "#ff6b6b";
+      ctx.font = "bold 8px monospace";
+      ctx.textAlign = "left";
+      ctx.fillText(`✗ ${it.name}`, 38, rowY - 1);
+      // Red Defect Label right underneath!
+      ctx.fillStyle = "#ff2a2a";
+      ctx.font = "bold 7.5px monospace";
+      ctx.fillText(`  REFUND: ${it.defect}!`, 38, rowY + 10);
+
+      ctx.fillStyle = "#ff4d4d";
+      ctx.font = "bold 9px monospace";
+      ctx.textAlign = "right";
+      ctx.fillText(`-£${Math.abs(it.val)}`, 320, rowY + 4);
+    } else {
+      ctx.fillStyle = "#51cf66";
+      ctx.font = "bold 8.5px monospace";
+      ctx.textAlign = "left";
+      ctx.fillText(`✓ ${it.name}`, 38, rowY + 4);
+
+      ctx.fillStyle = "#ffd43b";
+      ctx.font = "bold 9px monospace";
+      ctx.textAlign = "right";
+      ctx.fillText(`+£${it.val}`, 320, rowY + 4);
+    }
+  }
+
+  ctx.textAlign = "center";
+  if (pcCutscene.minLock > 0) {
+    ctx.fillStyle = "#495057";
+    ctx.fillRect(46, 495, 268, 38);
+    ctx.fillStyle = "#ced4da";
+    ctx.font = "bold 12px monospace";
+    ctx.fillText("LISTING ITEMS...", 180, 519);
+  } else {
+    ctx.fillStyle = "#51cf66";
+    ctx.fillRect(46, 495, 268, 38);
+    ctx.fillStyle = "#000";
+    ctx.font = "bold 12px monospace";
+    ctx.fillText("TAP OR PRESS SPACE TO CONTINUE", 180, 519);
+  }
+}
+
+function drawSummaryScreen() {
+  ctx.fillStyle = "rgba(10, 10, 16, 0.94)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const isFinal = gameState === 'GAMEOVER';
+  const thisLevelScore = levelScores[currentLevel - 1];
+  const rankObj = getRankForLevelScore(thisLevelScore, currentLevel);
+
+  ctx.fillStyle = "#eb7a24";
+  ctx.font = "bold 18px monospace";
+  ctx.textAlign = "center";
+  ctx.fillText(isFinal ? "CAMPAIGN COMPLETE!" : `LEVEL ${currentLevel} COMPLETE!`, 180, 48);
+
+  drawMasterCharacter(78, 128, 1.5, true, 0);
+
+  // Current Level Rank Badge
+  ctx.fillStyle = "#1f212e";
+  ctx.fillRect(125, 68, 210, 68);
+  ctx.strokeStyle = rankObj.color;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(125, 68, 210, 68);
+
+  ctx.fillStyle = "#adb5bd";
+  ctx.font = "bold 8px monospace";
+  ctx.fillText(`LEVEL ${currentLevel} PROFIT: £${thisLevelScore.toLocaleString()}`, 230, 86);
+  ctx.fillText(`MASTER TARGET: £${getLevelTarget(currentLevel).toLocaleString()}`, 230, 99);
+  ctx.fillStyle = rankObj.color;
+  ctx.font = "bold 9.5px monospace";
+  ctx.fillText(rankObj.title, 230, 120);
+
+  // Per-Level Individual Breakdown & Totals Box
+  ctx.fillStyle = "#161824";
+  ctx.fillRect(22, 152, 316, 310);
+  ctx.strokeStyle = "#ffd43b";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(22, 152, 316, 310);
+
+  ctx.fillStyle = "#ffd43b";
+  ctx.font = "bold 11px monospace";
+  ctx.fillText("INDIVIDUAL LEVEL SCORES & RANKS:", 180, 174);
+
+  const lvlLabels = [
+    "L1: High Street (Goal £15k)",
+    "L2: Car Boot Sale (Goal £15k)",
+    "L3: Cardiff Card Show (Goal £25k)"
+  ];
+
+  for (let i = 0; i < 3; i++) {
+    const yPos = 200 + i * 52;
+    const played = i < currentLevel;
+    const sc = levelScores[i];
+    const r = getRankForLevelScore(sc, i + 1);
+
+    ctx.fillStyle = played ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.25)";
+    ctx.fillRect(32, yPos - 14, 296, 42);
+
+    ctx.textAlign = "left";
+    ctx.fillStyle = played ? "#ffffff" : "#495057";
+    ctx.font = "bold 9px monospace";
+    ctx.fillText(lvlLabels[i], 40, yPos);
+
+    ctx.textAlign = "right";
+    ctx.fillStyle = played ? "#51cf66" : "#495057";
+    ctx.font = "bold 11px monospace";
+    ctx.fillText(played ? `£${sc.toLocaleString()}` : "---", 320, yPos);
+
+    ctx.textAlign = "left";
+    ctx.fillStyle = played ? r.color : "#495057";
+    ctx.font = "bold 8px monospace";
+    ctx.fillText(played ? `RANK: ${r.title}` : "LOCKED", 40, yPos + 18);
+  }
+
+  // Cumulative Totals Section
+  const totalProfit = levelScores[0] + levelScores[1] + levelScores[2];
+  ctx.strokeStyle = "#343a40";
+  ctx.beginPath();
+  ctx.moveTo(34, 358);
+  ctx.lineTo(326, 358);
+  ctx.stroke();
+
+  ctx.textAlign = "left";
+  ctx.fillStyle = "#adb5bd";
+  ctx.font = "bold 9.5px monospace";
+  ctx.fillText(`TOTAL ITEMS SOLD AT PC: ${totalHaulSoldCount}`, 40, 378);
+  ctx.fillStyle = "#ff6b6b";
+  ctx.fillText(`INFLUENCER VLOG BONUSES: £${ytSubscriberBonus.toLocaleString()}`, 40, 396);
+
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#ffd43b";
+  ctx.font = "bold 11px monospace";
+  ctx.fillText("CUMULATIVE TOTAL PROFIT:", 180, 422);
+  ctx.fillStyle = "#51cf66";
+  ctx.font = "bold 24px monospace";
+  ctx.fillText(`£${totalProfit.toLocaleString()}`, 180, 448);
+
+  // 5-Second Cooldown Lock Bar
+  if (gameOverCooldown > 0) {
+    ctx.fillStyle = "#343a40";
+    ctx.fillRect(45, 490, 270, 44);
+    ctx.fillStyle = "#eb7a24";
+    const pct = (5 - gameOverCooldown) / 5;
+    ctx.fillRect(45, 490, 270 * pct, 44);
+    ctx.strokeStyle = "#ffffff";
+    ctx.strokeRect(45, 490, 270, 44);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 13px monospace";
+    ctx.fillText(`WAIT ${Math.ceil(gameOverCooldown)}s...`, 180, 517);
+  } else {
+    ctx.fillStyle = "#51cf66";
+    ctx.fillRect(45, 490, 270, 44);
+    ctx.fillStyle = "#000";
+    ctx.font = "bold 13px monospace";
+    const btnText = isFinal ? "TAP / SPACE TO PLAY AGAIN" : `START LEVEL ${currentLevel + 1}`;
+    ctx.fillText(btnText, 180, 517);
+  }
+}
+
+function drawTitleScreen() {
+  ctx.fillStyle = "#0e0e14";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Clean Orange Circle Logo (Black square icon removed)
+  ctx.save();
+  ctx.translate(180, 132);
+  ctx.fillStyle = "#eb7a24";
+  ctx.beginPath();
+  ctx.arc(0, 0, 82, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.rotate(-0.18);
+  ctx.fillStyle = "#0e0e14";
+  ctx.fillRect(-105, -24, 210, 54);
+
+  ctx.fillStyle = "#ced4da";
+  ctx.font = "italic bold 20px serif";
+  ctx.textAlign = "center";
+  ctx.fillText("THE", -32, -30);
+
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "900 32px sans-serif";
+  ctx.fillText("MASTER", 0, 8);
+
+  ctx.font = "bold 15px sans-serif";
+  ctx.fillText("OF   PIECES", 6, 25);
+  ctx.restore();
+
+  // Character & Cycling Pickup Showcase Box
+  ctx.fillStyle = "#1f212e";
+  ctx.fillRect(28, 234, 304, 152);
+  ctx.strokeStyle = "#eb7a24";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(28, 234, 304, 152);
+
+  // Master Character on Left (Red underline & "6 ITEMS" removed)
+  drawMasterCharacter(98, 356, 1.9, false, 0);
+
+  // Animated Cycling Pickup Showcase on Right
+  const allShowItems = [...ITEM_LIBRARY, ...CARD_SHOW_LIBRARY];
+  const cycleIdx = Math.floor(Date.now() / 1300) % allShowItems.length;
+  const featuredItem = allShowItems[cycleIdx];
+  const bobOffset = Math.sin(Date.now() / 180) * 4;
+
+  // Pedestal Card Box
+  ctx.fillStyle = "#141622";
+  ctx.fillRect(152, 248, 168, 122);
+  ctx.strokeStyle = "#ffd43b";
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(152, 248, 168, 122);
+
+  // Pickup Name Printed Above the Icon
+  ctx.fillStyle = "#ffd43b";
+  ctx.font = "bold 8.5px monospace";
+  ctx.textAlign = "center";
+  ctx.fillText(featuredItem.name, 236, 268);
+
+  // Glowing Aura + Scaled-Up Item Sprite
+  ctx.fillStyle = "rgba(255, 212, 59, 0.22)";
+  ctx.beginPath();
+  ctx.arc(236, 314 + bobOffset, 24, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.save();
+  ctx.translate(236, 330 + bobOffset);
+  ctx.scale(2.4, 2.4);
+  drawDetailedItemSprite(featuredItem, 0, 0);
+  ctx.restore();
+
+  // Item Value Tag Below Icon
+  ctx.fillStyle = "#51cf66";
+  ctx.font = "bold 12px monospace";
+  ctx.textAlign = "center";
+  ctx.fillText(`RESELL VAL: £${featuredItem.val}`, 236, 358);
+
+  // Clear PC Keyboard & Gameplay Controls Box
+  ctx.fillStyle = "#ffd43b";
+  ctx.font = "bold 10px monospace";
+  ctx.fillText("PC KEYBOARD & TOUCH CONTROLS:", 180, 406);
+
+  ctx.fillStyle = "#ced4da";
+  ctx.font = "9px monospace";
+  ctx.fillText("• MOVE: WASD / Arrows | SMASH: [Z] or [J]", 180, 425);
+  ctx.fillText("• THROW CARD (-£1): [X] or [K]", 180, 441);
+  ctx.fillText("• RAID SHOP / BOOT: [C] or [SPACE]", 180, 457);
+  ctx.fillText("• Beware stinky blue IKEA knock-off bags!", 180, 473);
+  ctx.fillText("• Film in Influencer Zones for £1,000 bonus!", 180, 489);
+
+  if (Math.floor(Date.now() / 350) % 2 === 0) {
+    ctx.fillStyle = "#51cf66";
+    ctx.fillRect(55, 520, 250, 44);
+    ctx.fillStyle = "#000";
+    ctx.font = "bold 14px monospace";
+    ctx.fillText("TAP OR PRESS SPACE", 180, 547);
+  }
+}
+
+// --- MAIN LOOP ---
+function loop() {
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+loop();
+</script>
+</body>
+</html>
