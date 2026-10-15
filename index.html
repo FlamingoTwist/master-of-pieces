@@ -2110,71 +2110,293 @@ function drawHUD() {
   }
 }
 
+function drawScratchLine(x1, y1, x2, y2, dark = "rgba(18, 6, 28, 0.55)", light = "rgba(255, 255, 255, 0.2)") {
+  ctx.save();
+  ctx.strokeStyle = dark;
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+
+  ctx.strokeStyle = light;
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(x1 + 0.8, y1 + 0.8);
+  ctx.lineTo(x2 + 0.8, y2 + 0.8);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawMobileControls() {
-  ctx.fillStyle = "rgba(12, 12, 18, 0.55)";
+  // --- SOLID GAME BOY COLOR "GRAPE" PURPLE LOWER SHELL ---
+  ctx.fillStyle = "#47246b";
   ctx.fillRect(0, 420, canvas.width, 220);
 
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.arc(touchCtrl.joyOriginX, touchCtrl.joyOriginY, 40, 0, Math.PI * 2);
-  ctx.stroke();
+  // Molded plastic seam / bezel ridge separating screen from lower shell
+  ctx.fillStyle = "#1c092b";
+  ctx.fillRect(0, 420, canvas.width, 2);
+  ctx.fillStyle = "#7a42a8";
+  ctx.fillRect(0, 422, canvas.width, 2);
+  ctx.fillStyle = "#5a2f80";
+  ctx.fillRect(0, 424, canvas.width, 2);
 
-  ctx.fillStyle = "rgba(235, 122, 36, 0.85)";
-  ctx.beginPath();
-  ctx.arc(touchCtrl.joyX, touchCtrl.joyY, 20, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = "rgba(255, 255, 255, 0.55)";
-  ctx.font = "bold 7px monospace";
+  // Debossed Retro Handheld Brand Crest
   ctx.textAlign = "center";
-  ctx.fillText("WASD / ARROWS", touchCtrl.joyOriginX, touchCtrl.joyOriginY + 52);
+  ctx.font = "italic bold 9.5px sans-serif";
+  ctx.fillStyle = "#220b33";
+  ctx.fillText("PIECE BOY COLOR", 180, 437);
+  ctx.fillStyle = "#6e3b94";
+  ctx.fillText("PIECE BOY COLOR", 180, 436);
 
-  // Oversized Primary SMASH Button
-  ctx.fillStyle = touchCtrl.smashPressed ? "#ff922b" : "#e03131";
-  ctx.beginPath();
-  ctx.arc(230, 562, 46, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = "#fff";
-  ctx.lineWidth = 3;
-  ctx.stroke();
-  ctx.fillStyle = "#fff";
-  ctx.font = "bold 13px monospace";
-  ctx.textAlign = "center";
-  ctx.fillText("SMASH!", 230, 560);
-  ctx.fillStyle = "#ffd43b";
-  ctx.font = "bold 8.5px monospace";
-  ctx.fillText("[Z / J]", 230, 575);
+  // Molded Speaker Grille Slits (Bottom-Right Corner)
+  ctx.save();
+  for (let i = 0; i < 6; i++) {
+    const sx = 312 + i * 6;
+    const sy = 632 - i * 3.5;
+    ctx.strokeStyle = "#1b082b";
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(sx + 7, sy - 8);
+    ctx.stroke();
 
-  // POKEMON CARD Button (-£1)
-  ctx.fillStyle = touchCtrl.cardPressed ? "#74c0fc" : "#1971c2";
+    ctx.strokeStyle = "#6d3b94";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(sx + 1, sy + 1);
+    ctx.lineTo(sx + 8, sy - 7);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // --- SCRATCHES & RETRO PLASTIC IMPERFECTIONS ---
+  // Long diagonal key scratch across the left casing
+  drawScratchLine(26, 438, 114, 482);
+  drawScratchLine(42, 452, 78, 474, "rgba(18, 6, 28, 0.4)", "rgba(255, 255, 255, 0.14)");
+
+  // Hairline scuff near D-Pad
+  drawScratchLine(124, 512, 145, 526);
+
+  // Center console scratch
+  drawScratchLine(152, 454, 218, 474);
+  drawScratchLine(160, 459, 198, 473, "rgba(18, 6, 28, 0.35)", "rgba(255, 255, 255, 0.12)");
+
+  // Curved scratch above action buttons
+  drawScratchLine(212, 502, 252, 514);
+  drawScratchLine(280, 486, 305, 498);
+
+  // Corner scuffs and drop dings
+  drawScratchLine(12, 616, 38, 632);
+  drawScratchLine(18, 624, 44, 636, "rgba(18, 6, 28, 0.4)", "rgba(255, 255, 255, 0.15)");
+
+  // Little melted plastic ding / nick
+  ctx.fillStyle = "#1b082b";
+  ctx.fillRect(194, 596, 3, 3);
+  ctx.fillStyle = "#6d3b94";
+  ctx.fillRect(195, 598, 3, 1);
+
+  // --- RECESSED D-PAD / JOYSTICK WELL ---
+  // Molded socket ring
+  ctx.fillStyle = "#1e0a2e";
   ctx.beginPath();
-  ctx.arc(318, 512, 30, 0, Math.PI * 2);
+  ctx.arc(touchCtrl.joyOriginX, touchCtrl.joyOriginY, 43, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = "#ffd43b";
+  ctx.strokeStyle = "#65338c";
   ctx.lineWidth = 2;
   ctx.stroke();
-  ctx.fillStyle = "#ffd43b";
-  ctx.font = "bold 9px monospace";
-  ctx.fillText("CARD -£1", 318, 510);
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "bold 7px monospace";
-  ctx.fillText("[X / K]", 318, 521);
 
-  // SHOP / BOOT / BOOTH RAID Button
-  const canRaid = player.nearBuilding && !player.nearBuilding.raided && cashBanked >= player.nearBuilding.cost;
-  ctx.fillStyle = canRaid ? "#2f9e44" : "rgba(73, 80, 87, 0.65)";
+  // Molded directional arrow indents in socket base
+  ctx.fillStyle = "#2c1340";
+  ctx.fillRect(touchCtrl.joyOriginX - 2, touchCtrl.joyOriginY - 39, 4, 6);
+  ctx.fillRect(touchCtrl.joyOriginX - 2, touchCtrl.joyOriginY + 33, 4, 6);
+  ctx.fillRect(touchCtrl.joyOriginX - 39, touchCtrl.joyOriginY - 2, 6, 4);
+  ctx.fillRect(touchCtrl.joyOriginX + 33, touchCtrl.joyOriginY - 2, 6, 4);
+
+  // D-Pad Nub (Matte vintage slate plastic)
+  ctx.fillStyle = "#292a33";
   ctx.beginPath();
-  ctx.arc(270, 450, 26, 0, Math.PI * 2);
+  ctx.arc(touchCtrl.joyX, touchCtrl.joyY, 21, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = canRaid ? "#51cf66" : "#868e96";
+
+  // 3D Bevel on Joy Nub
+  ctx.strokeStyle = "#404250";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(touchCtrl.joyX, touchCtrl.joyY, 20, Math.PI * 0.75, Math.PI * 1.75);
   ctx.stroke();
-  ctx.fillStyle = "#fff";
-  ctx.font = "bold 8px monospace";
-  ctx.fillText(currentLevel === 2 ? "BOOT" : "RAID", 270, 446);
+  ctx.strokeStyle = "#121318";
+  ctx.beginPath();
+  ctx.arc(touchCtrl.joyX, touchCtrl.joyY, 20, Math.PI * 1.75, Math.PI * 0.75);
+  ctx.stroke();
+
+  // Inner Concave Thumb Dish
+  ctx.fillStyle = "#1d1e24";
+  ctx.beginPath();
+  ctx.arc(touchCtrl.joyX, touchCtrl.joyY, 13, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Center grip textured dimple
+  ctx.fillStyle = "#111215";
+  ctx.fillRect(touchCtrl.joyX - 1.5, touchCtrl.joyY - 6, 3, 12);
+  ctx.fillRect(touchCtrl.joyX - 6, touchCtrl.joyY - 1.5, 12, 3);
+
+  // Scratch across thumb nub
+  drawScratchLine(touchCtrl.joyX - 9, touchCtrl.joyY - 6, touchCtrl.joyX + 7, touchCtrl.joyY + 8, "rgba(8, 8, 12, 0.7)", "rgba(255, 255, 255, 0.25)");
+
+  // Debossed Direction Legend
+  ctx.fillStyle = "#1d0a2d";
+  ctx.font = "bold 7px monospace";
+  ctx.textAlign = "center";
+  ctx.fillText("WASD / ARROWS", touchCtrl.joyOriginX, touchCtrl.joyOriginY + 54);
+  ctx.fillStyle = "#75429e";
+  ctx.fillText("WASD / ARROWS", touchCtrl.joyOriginX, touchCtrl.joyOriginY + 53);
+
+  // --- RETRO SMASH BUTTON (A Button - Burgundy / Magenta Plastic) ---
+  const smashY = 562;
+  const smashPressOffset = touchCtrl.smashPressed ? 3 : 0;
+
+  // Recessed socket
+  ctx.fillStyle = "#1c092b";
+  ctx.beginPath();
+  ctx.arc(230, smashY + 2, 47, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#63308a";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // 3D Drop shadow when resting
+  if (!touchCtrl.smashPressed) {
+    ctx.fillStyle = "#5c0926";
+    ctx.beginPath();
+    ctx.arc(230, smashY + 5, 45, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Button Body
+  ctx.fillStyle = touchCtrl.smashPressed ? "#7d1438" : "#b02253";
+  ctx.beginPath();
+  ctx.arc(230, smashY + smashPressOffset, 45, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Top highlight bevel rim
+  ctx.strokeStyle = touchCtrl.smashPressed ? "#b02253" : "#e64980";
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.arc(230, smashY + smashPressOffset, 43, Math.PI * 0.9, Math.PI * 1.9);
+  ctx.stroke();
+
+  // Scratches on SMASH button face
+  drawScratchLine(212, smashY - 14 + smashPressOffset, 246, smashY + 12 + smashPressOffset, "rgba(40, 5, 18, 0.6)", "rgba(255, 255, 255, 0.25)");
+  drawScratchLine(224, smashY + 18 + smashPressOffset, 244, smashY + 24 + smashPressOffset, "rgba(40, 5, 18, 0.5)", "rgba(255, 255, 255, 0.2)");
+
+  // Stamped Button Legend
+  ctx.fillStyle = "#3a0515";
+  ctx.font = "bold 13px monospace";
+  ctx.fillText("SMASH!", 230, smashY + smashPressOffset - 1);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText("SMASH!", 230, smashY + smashPressOffset - 2);
+
   ctx.fillStyle = "#ffd43b";
+  ctx.font = "bold 8.5px monospace";
+  ctx.fillText("[Z / J]", 230, smashY + smashPressOffset + 13);
+
+  // --- RETRO POKEMON CARD BUTTON (B Button - Cyan / Teal Blue Plastic) ---
+  const cardY = 512;
+  const cardPressOffset = touchCtrl.cardPressed ? 2 : 0;
+
+  // Recessed socket
+  ctx.fillStyle = "#1c092b";
+  ctx.beginPath();
+  ctx.arc(318, cardY + 2, 32, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#63308a";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Drop shadow when resting
+  if (!touchCtrl.cardPressed) {
+    ctx.fillStyle = "#0b3254";
+    ctx.beginPath();
+    ctx.arc(318, cardY + 4, 30, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Button Body
+  ctx.fillStyle = touchCtrl.cardPressed ? "#0d4373" : "#1971c2";
+  ctx.beginPath();
+  ctx.arc(318, cardY + cardPressOffset, 30, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Top highlight bevel rim
+  ctx.strokeStyle = touchCtrl.cardPressed ? "#1971c2" : "#4dabf7";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(318, cardY + cardPressOffset, 28, Math.PI * 0.9, Math.PI * 1.9);
+  ctx.stroke();
+
+  // Scratches across card button
+  drawScratchLine(306, cardY - 8 + cardPressOffset, 330, cardY + 8 + cardPressOffset, "rgba(5, 22, 40, 0.6)", "rgba(255, 255, 255, 0.25)");
+
+  // Stamped Legend
+  ctx.fillStyle = "#071e33";
+  ctx.font = "bold 9px monospace";
+  ctx.fillText("CARD -£1", 318, cardY + cardPressOffset - 1);
+  ctx.fillStyle = "#ffd43b";
+  ctx.fillText("CARD -£1", 318, cardY + cardPressOffset - 2);
+
+  ctx.fillStyle = "#d0ebff";
+  ctx.font = "bold 7px monospace";
+  ctx.fillText("[X / K]", 318, cardY + cardPressOffset + 10);
+
+  // --- RETRO SHOP / BOOT / BOOTH RAID BUTTON (Utility Action Button) ---
+  const raidY = 450;
+  const canRaid = player.nearBuilding && !player.nearBuilding.raided && cashBanked >= player.nearBuilding.cost;
+  const raidPressOffset = touchCtrl.actionPressed ? 2 : 0;
+
+  // Recessed socket
+  ctx.fillStyle = "#1c092b";
+  ctx.beginPath();
+  ctx.arc(270, raidY + 2, 28, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#63308a";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Drop shadow
+  if (!touchCtrl.actionPressed) {
+    ctx.fillStyle = canRaid ? "#14461c" : "#231a2b";
+    ctx.beginPath();
+    ctx.arc(270, raidY + 3, 26, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Button Body
+  ctx.fillStyle = canRaid
+    ? (touchCtrl.actionPressed ? "#1e6b30" : "#2b8a3e")
+    : (touchCtrl.actionPressed ? "#35293d" : "#443550");
+  ctx.beginPath();
+  ctx.arc(270, raidY + raidPressOffset, 26, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Top highlight rim
+  ctx.strokeStyle = canRaid ? "#51cf66" : "#655075";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(270, raidY + raidPressOffset, 24, Math.PI * 0.9, Math.PI * 1.9);
+  ctx.stroke();
+
+  // Scratches on raid button
+  drawScratchLine(260, raidY - 6 + raidPressOffset, 278, raidY + 7 + raidPressOffset, "rgba(10, 20, 10, 0.5)", "rgba(255, 255, 255, 0.2)");
+
+  // Stamped Legend
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 8.5px monospace";
+  ctx.fillText(currentLevel === 2 ? "BOOT" : "RAID", 270, raidY + raidPressOffset - 2);
+
+  ctx.fillStyle = canRaid ? "#ffd43b" : "#adb5bd";
   ctx.font = "bold 6.5px monospace";
-  ctx.fillText("[C/SPACE]", 270, 457);
+  ctx.fillText("[C/SPACE]", 270, raidY + raidPressOffset + 9);
 }
 
 // PC Listing Cutscene with RED Knock-Off Defect Refund Warnings!
