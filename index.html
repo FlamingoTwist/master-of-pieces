@@ -1118,9 +1118,9 @@ function update() {
 
   resolveTableCollision(player, 11);
 
-  // Street boundaries
+  // Street boundaries (can walk down right to the control panel seam at screen Y = 416)
   player.x = Math.max(82, Math.min(278, player.x));
-  player.y = Math.min(cameraY + 340, player.y);
+  player.y = Math.min(cameraY + 416, player.y);
 
   // Scroll Camera Upwards
   const targetCamY = player.y - 295;
