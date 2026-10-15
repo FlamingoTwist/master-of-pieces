@@ -2110,7 +2110,7 @@ function drawHUD() {
   }
 }
 
-function drawScratchLine(x1, y1, x2, y2, dark = "rgba(18, 6, 28, 0.55)", light = "rgba(255, 255, 255, 0.2)") {
+function drawScratchLine(x1, y1, x2, y2, dark = "rgba(12, 4, 18, 0.65)", light = "rgba(255, 255, 255, 0.28)") {
   ctx.save();
   ctx.strokeStyle = dark;
   ctx.lineWidth = 1.2;
@@ -2128,275 +2128,419 @@ function drawScratchLine(x1, y1, x2, y2, dark = "rgba(18, 6, 28, 0.55)", light =
   ctx.restore();
 }
 
+function drawCornerScrew(x, y) {
+  ctx.save();
+  // Deep recessed dark socket
+  ctx.fillStyle = "#0c0316";
+  ctx.beginPath();
+  ctx.arc(x, y, 6.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Screw metallic head
+  ctx.fillStyle = "#2c2636";
+  ctx.beginPath();
+  ctx.arc(x, y, 5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Highlight on screw rim
+  ctx.strokeStyle = "#5f5670";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(x, y, 4.5, Math.PI * 0.75, Math.PI * 1.75);
+  ctx.stroke();
+
+  // Dark cross / plus slot
+  ctx.strokeStyle = "#0d0a14";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(x - 3, y);
+  ctx.lineTo(x + 3, y);
+  ctx.moveTo(x, y - 3);
+  ctx.lineTo(x, y + 3);
+  ctx.stroke();
+
+  // Specular light catch inside slot
+  ctx.fillStyle = "#736a87";
+  ctx.fillRect(x - 2, y + 1, 1, 1);
+  ctx.fillRect(x + 1, y - 2, 1, 1);
+  ctx.restore();
+}
+
 function drawMobileControls() {
-  // --- SOLID GAME BOY COLOR "GRAPE" PURPLE LOWER SHELL ---
-  ctx.fillStyle = "#47246b";
+  // --- BASE PLATE & RETRO DARK MARGIN ---
+  ctx.fillStyle = "#160824";
   ctx.fillRect(0, 420, canvas.width, 220);
 
-  // Molded plastic seam / bezel ridge separating screen from lower shell
-  ctx.fillStyle = "#1c092b";
-  ctx.fillRect(0, 420, canvas.width, 2);
-  ctx.fillStyle = "#7a42a8";
-  ctx.fillRect(0, 422, canvas.width, 2);
-  ctx.fillStyle = "#5a2f80";
-  ctx.fillRect(0, 424, canvas.width, 2);
-
-  // Debossed Retro Handheld Brand Crest
-  ctx.textAlign = "center";
-  ctx.font = "italic bold 9.5px sans-serif";
-  ctx.fillStyle = "#220b33";
-  ctx.fillText("PIECE BOY COLOR", 180, 437);
-  ctx.fillStyle = "#6e3b94";
-  ctx.fillText("PIECE BOY COLOR", 180, 436);
-
-  // Molded Speaker Grille Slits (Bottom-Right Corner)
+  // Outer panel plate with chiseled border
+  const px = 5, py = 423, pw = 350, ph = 213, pr = 8;
   ctx.save();
-  for (let i = 0; i < 6; i++) {
-    const sx = 312 + i * 6;
-    const sy = 632 - i * 3.5;
-    ctx.strokeStyle = "#1b082b";
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.moveTo(sx, sy);
-    ctx.lineTo(sx + 7, sy - 8);
-    ctx.stroke();
+  ctx.beginPath();
+  ctx.roundRect(px, py, pw, ph, pr);
+  ctx.clip();
 
-    ctx.strokeStyle = "#6d3b94";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(sx + 1, sy + 1);
-    ctx.lineTo(sx + 8, sy - 7);
-    ctx.stroke();
+  // Deep rich textured purple plastic fill
+  ctx.fillStyle = "#381552";
+  ctx.fillRect(px, py, pw, ph);
+
+  // Subtle gradient depth
+  const grad = ctx.createLinearGradient(0, py, 0, py + ph);
+  grad.addColorStop(0, "rgba(78, 30, 115, 0.45)");
+  grad.addColorStop(0.5, "rgba(50, 18, 76, 0.15)");
+  grad.addColorStop(1, "rgba(22, 7, 36, 0.65)");
+  ctx.fillStyle = grad;
+  ctx.fillRect(px, py, pw, ph);
+
+  // Dithered pixel texture grain
+  for (let y = py; y < py + ph; y += 4) {
+    for (let x = px; x < px + pw; x += 4) {
+      if ((x * 13 + y * 7) % 11 === 0) {
+        ctx.fillStyle = "rgba(18, 6, 28, 0.28)";
+        ctx.fillRect(x, y, 2, 2);
+      } else if ((x * 5 + y * 19) % 13 === 0) {
+        ctx.fillStyle = "rgba(105, 45, 148, 0.12)";
+        ctx.fillRect(x, y, 2, 2);
+      }
+    }
   }
-  ctx.restore();
 
-  // --- SCRATCHES & RETRO PLASTIC IMPERFECTIONS ---
-  // Long diagonal key scratch across the left casing
-  drawScratchLine(26, 438, 114, 482);
-  drawScratchLine(42, 452, 78, 474, "rgba(18, 6, 28, 0.4)", "rgba(255, 255, 255, 0.14)");
+  // --- SURFACE SCRATCHES & GOUGES (Matching Reference) ---
+  // Diagonal gouges cutting into top bezel
+  drawScratchLine(62, 424, 78, 436);
+  drawScratchLine(68, 423, 75, 430, "rgba(12, 4, 18, 0.7)", "rgba(255, 255, 255, 0.35)");
+  drawScratchLine(278, 424, 296, 438);
 
-  // Hairline scuff near D-Pad
-  drawScratchLine(124, 512, 145, 526);
+  // Long face scratches
+  drawScratchLine(30, 442, 116, 486);
+  drawScratchLine(42, 455, 82, 478, "rgba(12, 4, 18, 0.5)", "rgba(255, 255, 255, 0.2)");
+  drawScratchLine(148, 458, 226, 478);
+  drawScratchLine(158, 464, 194, 475, "rgba(12, 4, 18, 0.4)", "rgba(255, 255, 255, 0.15)");
+  drawScratchLine(212, 506, 256, 518);
+  drawScratchLine(322, 558, 348, 574);
+  drawScratchLine(328, 568, 344, 580, "rgba(12, 4, 18, 0.5)", "rgba(255, 255, 255, 0.25)");
 
-  // Center console scratch
-  drawScratchLine(152, 454, 218, 474);
-  drawScratchLine(160, 459, 198, 473, "rgba(18, 6, 28, 0.35)", "rgba(255, 255, 255, 0.12)");
+  // Bottom edge scuffs
+  drawScratchLine(18, 616, 42, 632);
+  drawScratchLine(288, 620, 312, 634);
 
-  // Curved scratch above action buttons
-  drawScratchLine(212, 502, 252, 514);
-  drawScratchLine(280, 486, 305, 498);
-
-  // Corner scuffs and drop dings
-  drawScratchLine(12, 616, 38, 632);
-  drawScratchLine(18, 624, 44, 636, "rgba(18, 6, 28, 0.4)", "rgba(255, 255, 255, 0.15)");
-
-  // Little melted plastic ding / nick
-  ctx.fillStyle = "#1b082b";
-  ctx.fillRect(194, 596, 3, 3);
-  ctx.fillStyle = "#6d3b94";
-  ctx.fillRect(195, 598, 3, 1);
-
-  // --- RECESSED D-PAD / JOYSTICK WELL ---
-  // Molded socket ring
-  ctx.fillStyle = "#1e0a2e";
-  ctx.beginPath();
-  ctx.arc(touchCtrl.joyOriginX, touchCtrl.joyOriginY, 43, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = "#65338c";
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  // Molded directional arrow indents in socket base
-  ctx.fillStyle = "#2c1340";
-  ctx.fillRect(touchCtrl.joyOriginX - 2, touchCtrl.joyOriginY - 39, 4, 6);
-  ctx.fillRect(touchCtrl.joyOriginX - 2, touchCtrl.joyOriginY + 33, 4, 6);
-  ctx.fillRect(touchCtrl.joyOriginX - 39, touchCtrl.joyOriginY - 2, 6, 4);
-  ctx.fillRect(touchCtrl.joyOriginX + 33, touchCtrl.joyOriginY - 2, 6, 4);
-
-  // D-Pad Nub (Matte vintage slate plastic)
-  ctx.fillStyle = "#292a33";
-  ctx.beginPath();
-  ctx.arc(touchCtrl.joyX, touchCtrl.joyY, 21, 0, Math.PI * 2);
-  ctx.fill();
-
-  // 3D Bevel on Joy Nub
-  ctx.strokeStyle = "#404250";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(touchCtrl.joyX, touchCtrl.joyY, 20, Math.PI * 0.75, Math.PI * 1.75);
-  ctx.stroke();
-  ctx.strokeStyle = "#121318";
-  ctx.beginPath();
-  ctx.arc(touchCtrl.joyX, touchCtrl.joyY, 20, Math.PI * 1.75, Math.PI * 0.75);
-  ctx.stroke();
-
-  // Inner Concave Thumb Dish
-  ctx.fillStyle = "#1d1e24";
-  ctx.beginPath();
-  ctx.arc(touchCtrl.joyX, touchCtrl.joyY, 13, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Center grip textured dimple
-  ctx.fillStyle = "#111215";
-  ctx.fillRect(touchCtrl.joyX - 1.5, touchCtrl.joyY - 6, 3, 12);
-  ctx.fillRect(touchCtrl.joyX - 6, touchCtrl.joyY - 1.5, 12, 3);
-
-  // Scratch across thumb nub
-  drawScratchLine(touchCtrl.joyX - 9, touchCtrl.joyY - 6, touchCtrl.joyX + 7, touchCtrl.joyY + 8, "rgba(8, 8, 12, 0.7)", "rgba(255, 255, 255, 0.25)");
-
-  // Debossed Direction Legend
-  ctx.fillStyle = "#1d0a2d";
-  ctx.font = "bold 7px monospace";
+  // --- DEBOSSED HEADER TEXT ---
   ctx.textAlign = "center";
-  ctx.fillText("WASD / ARROWS", touchCtrl.joyOriginX, touchCtrl.joyOriginY + 54);
-  ctx.fillStyle = "#75429e";
-  ctx.fillText("WASD / ARROWS", touchCtrl.joyOriginX, touchCtrl.joyOriginY + 53);
+  ctx.font = "bold 9.5px monospace";
+  ctx.fillStyle = "#1a0828";
+  ctx.fillText("FIERCE BOY COLOR", 180, 438);
+  ctx.fillStyle = "#6d3294";
+  ctx.fillText("FIERCE BOY COLOR", 180, 437);
 
-  // --- RETRO SMASH BUTTON (A Button - Burgundy / Magenta Plastic) ---
-  const smashY = 562;
-  const smashPressOffset = touchCtrl.smashPressed ? 3 : 0;
+  // --- D-PAD / CONTROLLER WELL (Matching Reference) ---
+  const jx = touchCtrl.joyOriginX;
+  const jy = touchCtrl.joyOriginY;
 
-  // Recessed socket
-  ctx.fillStyle = "#1c092b";
+  // Heavy black outer pixel contour ring
+  ctx.fillStyle = "#0c0314";
   ctx.beginPath();
-  ctx.arc(230, smashY + 2, 47, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = "#63308a";
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-
-  // 3D Drop shadow when resting
-  if (!touchCtrl.smashPressed) {
-    ctx.fillStyle = "#5c0926";
-    ctx.beginPath();
-    ctx.arc(230, smashY + 5, 45, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // Button Body
-  ctx.fillStyle = touchCtrl.smashPressed ? "#7d1438" : "#b02253";
-  ctx.beginPath();
-  ctx.arc(230, smashY + smashPressOffset, 45, 0, Math.PI * 2);
+  ctx.arc(jx, jy, 48, 0, Math.PI * 2);
   ctx.fill();
 
-  // Top highlight bevel rim
-  ctx.strokeStyle = touchCtrl.smashPressed ? "#b02253" : "#e64980";
+  // Thick beveled purple border ring
+  ctx.fillStyle = "#250d38";
+  ctx.beginPath();
+  ctx.arc(jx, jy, 46, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = "#7b35ad";
   ctx.lineWidth = 2.5;
   ctx.beginPath();
-  ctx.arc(230, smashY + smashPressOffset, 43, Math.PI * 0.9, Math.PI * 1.9);
+  ctx.arc(jx, jy, 44.5, Math.PI * 0.75, Math.PI * 1.75);
   ctx.stroke();
 
-  // Scratches on SMASH button face
-  drawScratchLine(212, smashY - 14 + smashPressOffset, 246, smashY + 12 + smashPressOffset, "rgba(40, 5, 18, 0.6)", "rgba(255, 255, 255, 0.25)");
-  drawScratchLine(224, smashY + 18 + smashPressOffset, 244, smashY + 24 + smashPressOffset, "rgba(40, 5, 18, 0.5)", "rgba(255, 255, 255, 0.2)");
-
-  // Stamped Button Legend
-  ctx.fillStyle = "#3a0515";
-  ctx.font = "bold 13px monospace";
-  ctx.fillText("SMASH!", 230, smashY + smashPressOffset - 1);
-  ctx.fillStyle = "#ffffff";
-  ctx.fillText("SMASH!", 230, smashY + smashPressOffset - 2);
-
-  ctx.fillStyle = "#ffd43b";
-  ctx.font = "bold 8.5px monospace";
-  ctx.fillText("[Z / J]", 230, smashY + smashPressOffset + 13);
-
-  // --- RETRO POKEMON CARD BUTTON (B Button - Cyan / Teal Blue Plastic) ---
-  const cardY = 512;
-  const cardPressOffset = touchCtrl.cardPressed ? 2 : 0;
-
-  // Recessed socket
-  ctx.fillStyle = "#1c092b";
+  ctx.strokeStyle = "#170724";
   ctx.beginPath();
-  ctx.arc(318, cardY + 2, 32, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = "#63308a";
-  ctx.lineWidth = 1.5;
+  ctx.arc(jx, jy, 44.5, Math.PI * 1.75, Math.PI * 0.75);
   ctx.stroke();
 
-  // Drop shadow when resting
-  if (!touchCtrl.cardPressed) {
-    ctx.fillStyle = "#0b3254";
-    ctx.beginPath();
-    ctx.arc(318, cardY + 4, 30, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // Button Body
-  ctx.fillStyle = touchCtrl.cardPressed ? "#0d4373" : "#1971c2";
+  // Recessed dark well
+  ctx.fillStyle = "#150b24";
   ctx.beginPath();
-  ctx.arc(318, cardY + cardPressOffset, 30, 0, Math.PI * 2);
+  ctx.arc(jx, jy, 42, 0, Math.PI * 2);
   ctx.fill();
 
-  // Top highlight bevel rim
-  ctx.strokeStyle = touchCtrl.cardPressed ? "#1971c2" : "#4dabf7";
+  // 4 Raised Directional Notches (North, South, East, West)
+  const notchColors = ["#6b299c", "#180726"];
+  // North
+  ctx.fillStyle = notchColors[0];
+  ctx.fillRect(jx - 2.5, jy - 39, 5, 8);
+  ctx.fillStyle = notchColors[1];
+  ctx.fillRect(jx - 2.5, jy - 33, 5, 2);
+  // South
+  ctx.fillStyle = notchColors[0];
+  ctx.fillRect(jx - 2.5, jy + 31, 5, 8);
+  ctx.fillStyle = notchColors[1];
+  ctx.fillRect(jx - 2.5, jy + 37, 5, 2);
+  // West
+  ctx.fillStyle = notchColors[0];
+  ctx.fillRect(jx - 39, jy - 2.5, 8, 5);
+  ctx.fillStyle = notchColors[1];
+  ctx.fillRect(jx - 33, jy - 2.5, 2, 5);
+  // East
+  ctx.fillStyle = notchColors[0];
+  ctx.fillRect(jx + 31, jy - 2.5, 8, 5);
+  ctx.fillStyle = notchColors[1];
+  ctx.fillRect(jx + 37, jy - 2.5, 2, 5);
+
+  // Joy Thumbstick Nub
+  const curJx = touchCtrl.joyX;
+  const curJy = touchCtrl.joyY;
+
+  // Heavy black outline on nub
+  ctx.fillStyle = "#0a0312";
+  ctx.beginPath();
+  ctx.arc(curJx, curJy, 23, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Slate plastic rim
+  ctx.fillStyle = "#2c2636";
+  ctx.beginPath();
+  ctx.arc(curJx, curJy, 21.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 3D Bevel on nub rim
+  ctx.strokeStyle = "#4d445c";
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.arc(318, cardY + cardPressOffset, 28, Math.PI * 0.9, Math.PI * 1.9);
+  ctx.arc(curJx, curJy, 20.5, Math.PI * 0.75, Math.PI * 1.75);
   ctx.stroke();
 
-  // Scratches across card button
-  drawScratchLine(306, cardY - 8 + cardPressOffset, 330, cardY + 8 + cardPressOffset, "rgba(5, 22, 40, 0.6)", "rgba(255, 255, 255, 0.25)");
+  ctx.strokeStyle = "#110e17";
+  ctx.beginPath();
+  ctx.arc(curJx, curJy, 20.5, Math.PI * 1.75, Math.PI * 0.75);
+  ctx.stroke();
 
-  // Stamped Legend
-  ctx.fillStyle = "#071e33";
-  ctx.font = "bold 9px monospace";
-  ctx.fillText("CARD -£1", 318, cardY + cardPressOffset - 1);
-  ctx.fillStyle = "#ffd43b";
-  ctx.fillText("CARD -£1", 318, cardY + cardPressOffset - 2);
+  // Recessed inner dish
+  ctx.fillStyle = "#1a1622";
+  ctx.beginPath();
+  ctx.arc(curJx, curJy, 14, 0, Math.PI * 2);
+  ctx.fill();
 
-  ctx.fillStyle = "#d0ebff";
-  ctx.font = "bold 7px monospace";
-  ctx.fillText("[X / K]", 318, cardY + cardPressOffset + 10);
+  // Center cross indentation
+  ctx.fillStyle = "#100d17";
+  ctx.fillRect(curJx - 2, curJy - 8, 4, 16);
+  ctx.fillRect(curJx - 8, curJy - 2, 16, 4);
 
-  // --- RETRO SHOP / BOOT / BOOTH RAID BUTTON (Utility Action Button) ---
-  const raidY = 450;
+  // Center dimple dot
+  ctx.fillStyle = "#08060d";
+  ctx.beginPath();
+  ctx.arc(curJx, curJy, 2.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Specular Gloss Catch on Thumbstick (Top-left crescent)
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.45)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(curJx, curJy, 17, Math.PI * 0.9, Math.PI * 1.4);
+  ctx.stroke();
+
+  // Legend underneath
+  ctx.font = "bold 8px monospace";
+  ctx.fillStyle = "#1c092c";
+  ctx.fillText("WASD / ARROWS", jx, jy + 55);
+  ctx.fillStyle = "#652f8c";
+  ctx.fillText("WASD / ARROWS", jx, jy + 54);
+
+  // --- BUTTON RENDERING HELPER (Heavy Outlines, Shading, Gloss Crescents) ---
+  function drawArcadeButton(cx, cy, r, isPressed, labelTop, labelSub, theme) {
+    const pressOffset = isPressed ? 3 : 0;
+    const by = cy + pressOffset;
+
+    // Heavy black pixel outline around socket
+    ctx.fillStyle = "#0a0212";
+    ctx.beginPath();
+    ctx.arc(cx, cy + 2, r + 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Dark recessed socket well
+    ctx.fillStyle = "#180924";
+    ctx.beginPath();
+    ctx.arc(cx, cy + 2, r + 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 3D Drop shadow under button when resting
+    if (!isPressed) {
+      ctx.fillStyle = theme.darkShadow;
+      ctx.beginPath();
+      ctx.arc(cx, cy + 4, r + 0.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Heavy black pixel contour outline around button body
+    ctx.fillStyle = "#0d0212";
+    ctx.beginPath();
+    ctx.arc(cx, by, r + 1.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Rich shaded radial/dome body gradient
+    const bGrad = ctx.createRadialGradient(cx - r * 0.35, by - r * 0.35, r * 0.1, cx, by, r);
+    bGrad.addColorStop(0, isPressed ? theme.pressedTop : theme.bodyTop);
+    bGrad.addColorStop(0.75, isPressed ? theme.pressedMid : theme.bodyMid);
+    bGrad.addColorStop(1, isPressed ? theme.pressedBottom : theme.bodyBottom);
+    ctx.fillStyle = bGrad;
+    ctx.beginPath();
+    ctx.arc(cx, by, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Outer Bevel Rim
+    ctx.strokeStyle = isPressed ? theme.pressedTop : theme.rimHighlight;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(cx, by, r - 1.2, Math.PI * 0.8, Math.PI * 1.85);
+    ctx.stroke();
+
+    ctx.strokeStyle = theme.rimShadow;
+    ctx.beginPath();
+    ctx.arc(cx, by, r - 1.2, Math.PI * 1.85, Math.PI * 0.8);
+    ctx.stroke();
+
+    // --- SIGNATURE GLOSSY SPECULAR HIGHLIGHT CRESCENT ---
+    // Outer colored halo
+    ctx.strokeStyle = theme.glossHalo;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(cx, by, r - 4, Math.PI * 0.92, Math.PI * 1.55);
+    ctx.stroke();
+
+    // Pure white core crescent
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.95)";
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.arc(cx, by, r - 4, Math.PI * 0.95, Math.PI * 1.48);
+    ctx.stroke();
+
+    // Soft reflective secondary gloss catch on bottom-right
+    ctx.strokeStyle = theme.glossReflect;
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.arc(cx, by, r - 3.5, Math.PI * 0.1, Math.PI * 0.4);
+    ctx.stroke();
+
+    // Scratches and edge paint chips across button face
+    for (const sc of theme.scratches) {
+      drawScratchLine(cx + sc[0], by + sc[1], cx + sc[2], by + sc[3], sc[4], sc[5]);
+    }
+
+    // Centered Chunky Typography with Drop Shadow
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#0c0210";
+    ctx.font = theme.topFont;
+    ctx.fillText(labelTop, cx, by + theme.topY + 1);
+    ctx.fillStyle = theme.topColor;
+    ctx.fillText(labelTop, cx, by + theme.topY);
+
+    ctx.fillStyle = "#0c0210";
+    ctx.font = theme.subFont;
+    ctx.fillText(labelSub, cx, by + theme.subY + 1);
+    ctx.fillStyle = theme.subColor;
+    ctx.fillText(labelSub, cx, by + theme.subY);
+  }
+
+  // --- BUTTON 1: SMASH! (Big Red/Crimson Center Button) ---
+  const smashTheme = {
+    darkShadow: "#4d061c",
+    bodyTop: "#f52765",
+    bodyMid: "#c71246",
+    bodyBottom: "#7a0525",
+    pressedTop: "#c71246",
+    pressedMid: "#990b34",
+    pressedBottom: "#520418",
+    rimHighlight: "#ff6395",
+    rimShadow: "#54061a",
+    glossHalo: "rgba(255, 120, 168, 0.55)",
+    glossReflect: "rgba(255, 140, 180, 0.35)",
+    scratches: [
+      [-16, -12, 14, 10, "rgba(45, 5, 18, 0.65)", "rgba(255, 255, 255, 0.4)"],
+      [6, 14, 26, 22, "rgba(45, 5, 18, 0.6)", "rgba(255, 255, 255, 0.35)"],
+      [-24, 6, -14, 16, "rgba(45, 5, 18, 0.55)", "rgba(255, 255, 255, 0.3)"]
+    ],
+    topFont: "900 13.5px monospace",
+    topY: -2,
+    topColor: "#ffffff",
+    subFont: "bold 9px monospace",
+    subY: 13,
+    subColor: "#ffd43b"
+  };
+  drawArcadeButton(230, 562, 45, touchCtrl.smashPressed, "SMASH!", "[Z / J]", smashTheme);
+
+  // --- BUTTON 2: POKEMON CARD (Vivid Arcade Blue Right Button) ---
+  const cardTheme = {
+    darkShadow: "#042247",
+    bodyTop: "#12a6f2",
+    bodyMid: "#0a7bc4",
+    bodyBottom: "#054378",
+    pressedTop: "#0a7bc4",
+    pressedMid: "#06588f",
+    pressedBottom: "#032c52",
+    rimHighlight: "#61d0ff",
+    rimShadow: "#04284d",
+    glossHalo: "rgba(90, 205, 255, 0.6)",
+    glossReflect: "rgba(110, 220, 255, 0.35)",
+    scratches: [
+      [-12, -8, 12, 6, "rgba(4, 22, 42, 0.65)", "rgba(255, 255, 255, 0.4)"],
+      [2, 10, 16, 16, "rgba(4, 22, 42, 0.6)", "rgba(255, 255, 255, 0.35)"]
+    ],
+    topFont: "bold 9px monospace",
+    topY: -2,
+    topColor: "#ffd43b",
+    subFont: "bold 7.5px monospace",
+    subY: 10,
+    subColor: "#ffffff"
+  };
+  drawArcadeButton(318, 512, 30, touchCtrl.cardPressed, "CARD -£1", "[X / K]", cardTheme);
+
+  // --- BUTTON 3: SHOP / BOOT / BOOTH RAID (Top Slate/Charcoal Utility Button) ---
   const canRaid = player.nearBuilding && !player.nearBuilding.raided && cashBanked >= player.nearBuilding.cost;
-  const raidPressOffset = touchCtrl.actionPressed ? 2 : 0;
+  const raidTheme = {
+    darkShadow: canRaid ? "#0f3818" : "#120f18",
+    bodyTop: canRaid ? "#38b857" : "#3c384a",
+    bodyMid: canRaid ? "#238a3d" : "#282434",
+    bodyBottom: canRaid ? "#115222" : "#16131e",
+    pressedTop: canRaid ? "#238a3d" : "#282434",
+    pressedMid: canRaid ? "#17632a" : "#1b1824",
+    pressedBottom: canRaid ? "#0d3d18" : "#0f0d14",
+    rimHighlight: canRaid ? "#65d97f" : "#5d5770",
+    rimShadow: canRaid ? "#0e3818" : "#120f17",
+    glossHalo: canRaid ? "rgba(100, 235, 130, 0.55)" : "rgba(130, 125, 155, 0.45)",
+    glossReflect: canRaid ? "rgba(120, 245, 150, 0.3)" : "rgba(140, 135, 165, 0.25)",
+    scratches: [
+      [-10, -6, 10, 6, "rgba(10, 8, 14, 0.6)", "rgba(255, 255, 255, 0.35)"]
+    ],
+    topFont: "bold 8.5px monospace",
+    topY: -2,
+    topColor: "#ffffff",
+    subFont: "bold 6.5px monospace",
+    subY: 9,
+    subColor: canRaid ? "#ffd43b" : "#b0abc9"
+  };
+  drawArcadeButton(270, 450, 26, touchCtrl.actionPressed, currentLevel === 2 ? "BOOT" : "RAID", "[C/SPACE]", raidTheme);
 
-  // Recessed socket
-  ctx.fillStyle = "#1c092b";
+  ctx.restore(); // End panel clip
+
+  // --- CHISELED METALLIC/PLASTIC BORDER & CORNER SCREWS ---
+  // Outer black border line
+  ctx.strokeStyle = "#0d0417";
+  ctx.lineWidth = 3;
   ctx.beginPath();
-  ctx.arc(270, raidY + 2, 28, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = "#63308a";
+  ctx.roundRect(px, py, pw, ph, pr);
+  ctx.stroke();
+
+  // Inset specular highlight along top/left, shadow along bottom/right
+  ctx.strokeStyle = "#7b37ab";
   ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.roundRect(px + 1.5, py + 1.5, pw - 3, ph - 3, pr - 1);
   ctx.stroke();
 
-  // Drop shadow
-  if (!touchCtrl.actionPressed) {
-    ctx.fillStyle = canRaid ? "#14461c" : "#231a2b";
-    ctx.beginPath();
-    ctx.arc(270, raidY + 3, 26, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // Button Body
-  ctx.fillStyle = canRaid
-    ? (touchCtrl.actionPressed ? "#1e6b30" : "#2b8a3e")
-    : (touchCtrl.actionPressed ? "#35293d" : "#443550");
-  ctx.beginPath();
-  ctx.arc(270, raidY + raidPressOffset, 26, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Top highlight rim
-  ctx.strokeStyle = canRaid ? "#51cf66" : "#655075";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(270, raidY + raidPressOffset, 24, Math.PI * 0.9, Math.PI * 1.9);
-  ctx.stroke();
-
-  // Scratches on raid button
-  drawScratchLine(260, raidY - 6 + raidPressOffset, 278, raidY + 7 + raidPressOffset, "rgba(10, 20, 10, 0.5)", "rgba(255, 255, 255, 0.2)");
-
-  // Stamped Legend
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "bold 8.5px monospace";
-  ctx.fillText(currentLevel === 2 ? "BOOT" : "RAID", 270, raidY + raidPressOffset - 2);
-
-  ctx.fillStyle = canRaid ? "#ffd43b" : "#adb5bd";
-  ctx.font = "bold 6.5px monospace";
-  ctx.fillText("[C/SPACE]", 270, raidY + raidPressOffset + 9);
+  // 4 Authentic Corner Screws
+  drawCornerScrew(17, 435);
+  drawCornerScrew(343, 435);
+  drawCornerScrew(17, 625);
+  drawCornerScrew(343, 625);
 }
 
 // PC Listing Cutscene with RED Knock-Off Defect Refund Warnings!
