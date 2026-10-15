@@ -1,2 +1,11 @@
 *.zip
 dist/
+www/
+node_modules/
+.gradle/
+build/
+android/.gradle/
+android/app/build/
+android/build/
+*.apk
+*.aab

@@ -1,0 +1,8 @@
+{
+  "appId": "com.flamingotwist.masterofpieces",
+  "appName": "The Master Of Pieces",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  }
+}

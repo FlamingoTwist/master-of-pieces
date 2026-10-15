@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  deploy:
+  deploy-html5:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -19,8 +19,53 @@ jobs:
       - name: Setup Butler
         uses: remarkablegames/setup-butler@v2
 
-      - name: Deploy to Itch.io
+      - name: Deploy to Itch.io HTML5
         run: |
           butler push "The Master Of Pieces.zip" FlamingoTwist/the-master-of-pieces:html5
+        env:
+          BUTLER_API_KEY: ${{ secrets.ITCH_API_KEY || secrets.BUTLER_API_KEY }}
+
+  deploy-android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install dependencies & sync Capacitor
+        run: |
+          npm ci
+          mkdir -p www
+          cp index.html www/index.html
+          npx cap sync android
+
+      - name: Build Android APK
+        working-directory: ./android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TheMasterOfPieces-Android
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Setup Butler
+        uses: remarkablegames/setup-butler@v2
+
+      - name: Deploy APK to Itch.io Android Channel
+        run: |
+          butler push android/app/build/outputs/apk/debug/app-debug.apk FlamingoTwist/the-master-of-pieces:android
         env:
           BUTLER_API_KEY: ${{ secrets.ITCH_API_KEY || secrets.BUTLER_API_KEY }}
