@@ -579,7 +579,7 @@ function handleTouch(e) {
     } else if (pos.y > 410) {
       if (Math.hypot(pos.x - 230, pos.y - 562) < 56) touchCtrl.smashPressed = true;
       if (Math.hypot(pos.x - 318, pos.y - 512) < 38) touchCtrl.cardPressed = true;
-      if (Math.hypot(pos.x - 270, pos.y - 450) < 36) touchCtrl.actionPressed = true;
+      if (Math.hypot(pos.x - 270, pos.y - 460) < 36) touchCtrl.actionPressed = true;
     }
   }
 
@@ -607,7 +607,7 @@ canvas.addEventListener('mousedown', e => {
   } else {
     if (Math.hypot(pos.x - 230, pos.y - 562) < 56) doSmash();
     if (Math.hypot(pos.x - 318, pos.y - 512) < 38) doThrowCard();
-    if (Math.hypot(pos.x - 270, pos.y - 450) < 36) doEnterBuilding();
+    if (Math.hypot(pos.x - 270, pos.y - 460) < 36) doEnterBuilding();
   }
 });
 
@@ -2128,71 +2128,31 @@ function drawScratchLine(x1, y1, x2, y2, dark = "rgba(12, 4, 18, 0.65)", light =
   ctx.restore();
 }
 
-function drawCornerScrew(x, y) {
-  ctx.save();
-  // Deep recessed dark socket
-  ctx.fillStyle = "#0c0316";
-  ctx.beginPath();
-  ctx.arc(x, y, 6.5, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Screw metallic head
-  ctx.fillStyle = "#2c2636";
-  ctx.beginPath();
-  ctx.arc(x, y, 5, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Highlight on screw rim
-  ctx.strokeStyle = "#5f5670";
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.arc(x, y, 4.5, Math.PI * 0.75, Math.PI * 1.75);
-  ctx.stroke();
-
-  // Dark cross / plus slot
-  ctx.strokeStyle = "#0d0a14";
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.moveTo(x - 3, y);
-  ctx.lineTo(x + 3, y);
-  ctx.moveTo(x, y - 3);
-  ctx.lineTo(x, y + 3);
-  ctx.stroke();
-
-  // Specular light catch inside slot
-  ctx.fillStyle = "#736a87";
-  ctx.fillRect(x - 2, y + 1, 1, 1);
-  ctx.fillRect(x + 1, y - 2, 1, 1);
-  ctx.restore();
-}
-
 function drawMobileControls() {
-  // --- BASE PLATE & RETRO DARK MARGIN ---
-  ctx.fillStyle = "#160824";
-  ctx.fillRect(0, 420, canvas.width, 220);
+  // --- SOLID GAME BOY COLOR HANDHELD PURPLE CASING ---
+  // Molded horizontal seam separating gameplay screen from lower handheld unit
+  ctx.fillStyle = "#180626";
+  ctx.fillRect(0, 420, canvas.width, 2);
+  ctx.fillStyle = "#7d38ab";
+  ctx.fillRect(0, 422, canvas.width, 2);
+  ctx.fillStyle = "#4f1c73";
+  ctx.fillRect(0, 424, canvas.width, 1);
 
-  // Outer panel plate with chiseled border
-  const px = 5, py = 423, pw = 350, ph = 213, pr = 8;
-  ctx.save();
-  ctx.beginPath();
-  ctx.roundRect(px, py, pw, ph, pr);
-  ctx.clip();
-
-  // Deep rich textured purple plastic fill
+  // Deep rich textured purple plastic shell body
   ctx.fillStyle = "#381552";
-  ctx.fillRect(px, py, pw, ph);
+  ctx.fillRect(0, 425, canvas.width, 215);
 
   // Subtle gradient depth
-  const grad = ctx.createLinearGradient(0, py, 0, py + ph);
+  const grad = ctx.createLinearGradient(0, 425, 0, 640);
   grad.addColorStop(0, "rgba(78, 30, 115, 0.45)");
   grad.addColorStop(0.5, "rgba(50, 18, 76, 0.15)");
   grad.addColorStop(1, "rgba(22, 7, 36, 0.65)");
   ctx.fillStyle = grad;
-  ctx.fillRect(px, py, pw, ph);
+  ctx.fillRect(0, 425, canvas.width, 215);
 
-  // Dithered pixel texture grain
-  for (let y = py; y < py + ph; y += 4) {
-    for (let x = px; x < px + pw; x += 4) {
+  // Dithered pixel texture grain across handheld plastic
+  for (let y = 425; y < 640; y += 4) {
+    for (let x = 0; x < canvas.width; x += 4) {
       if ((x * 13 + y * 7) % 11 === 0) {
         ctx.fillStyle = "rgba(18, 6, 28, 0.28)";
         ctx.fillRect(x, y, 2, 2);
@@ -2203,11 +2163,11 @@ function drawMobileControls() {
     }
   }
 
-  // --- SURFACE SCRATCHES & GOUGES (Matching Reference) ---
-  // Diagonal gouges cutting into top bezel
-  drawScratchLine(62, 424, 78, 436);
-  drawScratchLine(68, 423, 75, 430, "rgba(12, 4, 18, 0.7)", "rgba(255, 255, 255, 0.35)");
-  drawScratchLine(278, 424, 296, 438);
+  // --- SURFACE SCRATCHES & GOUGES (Handheld Weathering) ---
+  // Diagonal gouges near top seam
+  drawScratchLine(62, 425, 78, 436);
+  drawScratchLine(68, 424, 75, 430, "rgba(12, 4, 18, 0.7)", "rgba(255, 255, 255, 0.35)");
+  drawScratchLine(278, 425, 296, 438);
 
   // Long face scratches
   drawScratchLine(30, 442, 116, 486);
@@ -2221,14 +2181,6 @@ function drawMobileControls() {
   // Bottom edge scuffs
   drawScratchLine(18, 616, 42, 632);
   drawScratchLine(288, 620, 312, 634);
-
-  // --- DEBOSSED HEADER TEXT ---
-  ctx.textAlign = "center";
-  ctx.font = "bold 9.5px monospace";
-  ctx.fillStyle = "#1a0828";
-  ctx.fillText("FIERCE BOY COLOR", 180, 438);
-  ctx.fillStyle = "#6d3294";
-  ctx.fillText("FIERCE BOY COLOR", 180, 437);
 
   // --- D-PAD / CONTROLLER WELL (Matching Reference) ---
   const jx = touchCtrl.joyOriginX;
@@ -2493,7 +2445,7 @@ function drawMobileControls() {
   };
   drawArcadeButton(318, 512, 30, touchCtrl.cardPressed, "CARD -£1", "[X / K]", cardTheme);
 
-  // --- BUTTON 3: SHOP / BOOT / BOOTH RAID (Top Slate/Charcoal Utility Button) ---
+  // --- BUTTON 3: SHOP / BOOT / BOOTH RAID (Moved Down to Y=460 to Prevent Border Clipping) ---
   const canRaid = player.nearBuilding && !player.nearBuilding.raided && cashBanked >= player.nearBuilding.cost;
   const raidTheme = {
     darkShadow: canRaid ? "#0f3818" : "#120f18",
@@ -2510,37 +2462,14 @@ function drawMobileControls() {
     scratches: [
       [-10, -6, 10, 6, "rgba(10, 8, 14, 0.6)", "rgba(255, 255, 255, 0.35)"]
     ],
-    topFont: "bold 8.5px monospace",
+    topFont: "bold 8px monospace",
     topY: -2,
     topColor: "#ffffff",
     subFont: "bold 6.5px monospace",
     subY: 9,
     subColor: canRaid ? "#ffd43b" : "#b0abc9"
   };
-  drawArcadeButton(270, 450, 26, touchCtrl.actionPressed, currentLevel === 2 ? "BOOT" : "RAID", "[C/SPACE]", raidTheme);
-
-  ctx.restore(); // End panel clip
-
-  // --- CHISELED METALLIC/PLASTIC BORDER & CORNER SCREWS ---
-  // Outer black border line
-  ctx.strokeStyle = "#0d0417";
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.roundRect(px, py, pw, ph, pr);
-  ctx.stroke();
-
-  // Inset specular highlight along top/left, shadow along bottom/right
-  ctx.strokeStyle = "#7b37ab";
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.roundRect(px + 1.5, py + 1.5, pw - 3, ph - 3, pr - 1);
-  ctx.stroke();
-
-  // 4 Authentic Corner Screws
-  drawCornerScrew(17, 435);
-  drawCornerScrew(343, 435);
-  drawCornerScrew(17, 625);
-  drawCornerScrew(343, 625);
+  drawArcadeButton(270, 460, 23.5, touchCtrl.actionPressed, currentLevel === 2 ? "BOOT" : "RAID", "[C/SPACE]", raidTheme);
 }
 
 // PC Listing Cutscene with RED Knock-Off Defect Refund Warnings!
