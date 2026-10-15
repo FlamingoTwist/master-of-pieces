@@ -442,7 +442,8 @@ const lb = {
   myId: null,
   myRank: null,
   score: 0,
-  lockUntil: 0
+  lockUntil: 0,
+  fromTitle: false
 };
 
 function lbFetch(path, opts = {}) {
@@ -494,7 +495,25 @@ async function submitScoreAndLoad() {
 function lbLock() { lb.lockUntil = Date.now() + 450; }
 function lbUnlocked() { return Date.now() >= lb.lockUntil; }
 
+function openLeaderboardFromTitle() {
+  lb.fromTitle = true;
+  lb.status = 'loading';
+  lb.rows = [];
+  lb.myId = null;
+  lb.myRank = null;
+  lb.score = 0;
+  lbLock();
+  gameState = 'LEADERBOARD';
+  loadLeaderboard();
+}
+
+function returnToTitleFromLeaderboard() {
+  lbLock();
+  gameState = 'TITLE';
+}
+
 function enterInitials() {
+  lb.fromTitle = false;
   lb.score = levelScores[0] + levelScores[1] + levelScores[2];
   lb.cursor = 0;
   lb.status = 'idle';
@@ -513,6 +532,7 @@ function confirmInitials() {
 }
 
 function skipToLeaderboard() {
+  lb.fromTitle = false;
   lbLock();
   gameState = 'LEADERBOARD';
   loadLeaderboard();
@@ -535,13 +555,18 @@ function leaderboardPrimary() {
 }
 
 // Hit areas shared by drawing and touch/mouse handling
+const TITLE_UI = {
+  play: { x: 55, y: 508, w: 250, h: 42 },
+  leaderboard: { x: 55, y: 558, w: 250, h: 38 }
+};
+
 const LB_UI = {
   cx: [105, 180, 255],
   upY: 205, downY: 335, arrowH: 36, boxY: 244, boxW: 56, boxH: 84,
   submit: { x: 45, y: 430, w: 270, h: 44 },
   skip: { x: 115, y: 488, w: 130, h: 30 },
   primary: { x: 45, y: 500, w: 270, h: 44 },
-  secondary: { x: 115, y: 556, w: 130, h: 28 }
+  secondary: { x: 85, y: 556, w: 190, h: 30 }
 };
 
 function inRect(pos, r) {
@@ -564,8 +589,13 @@ function handleInitialsPointer(pos) {
 
 function handleLeaderboardPointer(pos) {
   if (!lbUnlocked()) return;
-  if (inRect(pos, LB_UI.primary)) leaderboardPrimary();
-  else if (lb.status === 'submit_error' && inRect(pos, LB_UI.secondary)) skipToLeaderboard();
+  if (inRect(pos, LB_UI.primary)) {
+    leaderboardPrimary();
+  } else if (lb.fromTitle) {
+    if (inRect(pos, LB_UI.secondary)) returnToTitleFromLeaderboard();
+  } else if (lb.status === 'submit_error' && inRect(pos, LB_UI.secondary)) {
+    skipToLeaderboard();
+  }
 }
 
 // Level Rank Thresholds (Non-cumulative per-level targets!)
@@ -628,8 +658,12 @@ const keys = {};
 window.addEventListener('keydown', e => {
   keys[e.code] = true;
   initAudio();
-  if (gameState === 'TITLE' && (e.code === 'Space' || e.code === 'Enter')) {
-    startNewCampaign();
+  if (gameState === 'TITLE') {
+    if (e.code === 'KeyL' || e.code === 'Tab') {
+      openLeaderboardFromTitle();
+    } else if (e.code === 'Space' || e.code === 'Enter') {
+      startNewCampaign();
+    }
   } else if (gameState === 'PC_ANIM' && pcCutscene.minLock <= 0) {
     if (['Space', 'Enter', 'KeyZ', 'KeyX', 'KeyC', 'KeyJ', 'KeyK', 'KeyL'].includes(e.code)) {
       gameState = 'PLAY';
@@ -656,8 +690,16 @@ window.addEventListener('keydown', e => {
     } else if (e.code === 'Escape') { skipToLeaderboard();
     }
   } else if (gameState === 'LEADERBOARD' && lbUnlocked()) {
-    if ((e.code === 'Enter' || e.code === 'Space') && !e.repeat) leaderboardPrimary();
-    else if (e.code === 'Escape' && lb.status === 'submit_error') skipToLeaderboard();
+    if (lb.fromTitle) {
+      if ((e.code === 'Escape' || e.code === 'Backspace' || e.code === 'KeyL') && !e.repeat) {
+        returnToTitleFromLeaderboard();
+      } else if ((e.code === 'Enter' || e.code === 'Space') && !e.repeat) {
+        leaderboardPrimary();
+      }
+    } else {
+      if ((e.code === 'Enter' || e.code === 'Space') && !e.repeat) leaderboardPrimary();
+      else if (e.code === 'Escape' && lb.status === 'submit_error') skipToLeaderboard();
+    }
   }
 
 });
@@ -687,7 +729,11 @@ function handlePointerAction(pos) {
   initAudio();
 
   if (gameState === 'TITLE') {
-    startNewCampaign();
+    if (inRect(pos, TITLE_UI.leaderboard)) {
+      openLeaderboardFromTitle();
+    } else {
+      startNewCampaign();
+    }
     return;
   }
   if (gameState === 'PC_ANIM') {
@@ -2982,7 +3028,11 @@ function drawLeaderboardScreen() {
   ctx.lineWidth = 1.5;
   ctx.strokeRect(25, 74, 310, 46);
 
-  if (lb.status === 'submitting') {
+  if (lb.fromTitle) {
+    ctx.fillStyle = "#adb5bd";
+    ctx.font = "bold 10px monospace";
+    ctx.fillText("GLOBAL HALL OF FAME • SUPABASE LIVE", 180, 101);
+  } else if (lb.status === 'submitting') {
     ctx.fillStyle = "#ffd43b";
     ctx.font = "bold 10.5px monospace";
     ctx.fillText("POSTING SCORE TO SUPABASE...", 180, 101);
@@ -3073,10 +3123,32 @@ function drawLeaderboardScreen() {
     }
   }
 
-  // Primary Action Button
+  // Buttons
   const btn = LB_UI.primary;
+  const sec = LB_UI.secondary;
   ctx.textAlign = "center";
-  if (lb.status === 'submit_error') {
+
+  if (lb.fromTitle) {
+    // Primary: Start Game
+    ctx.fillStyle = "#51cf66";
+    ctx.fillRect(btn.x, btn.y, btn.w, btn.h);
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(btn.x, btn.y, btn.w, btn.h);
+    ctx.fillStyle = "#000000";
+    ctx.font = "bold 13px monospace";
+    ctx.fillText("▶ PLAY GAME (TAP / SPACE)", 180, btn.y + 27);
+
+    // Secondary: Back to Title
+    ctx.fillStyle = "#2b3040";
+    ctx.fillRect(sec.x, sec.y, sec.w, sec.h);
+    ctx.strokeStyle = "#adb5bd";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(sec.x, sec.y, sec.w, sec.h);
+    ctx.fillStyle = "#adb5bd";
+    ctx.font = "bold 10px monospace";
+    ctx.fillText("← BACK TO TITLE (ESC)", 180, sec.y + 19);
+  } else if (lb.status === 'submit_error') {
     ctx.fillStyle = "#e03131";
     ctx.fillRect(btn.x, btn.y, btn.w, btn.h);
     ctx.strokeStyle = "#ffffff";
@@ -3087,7 +3159,6 @@ function drawLeaderboardScreen() {
     ctx.fillText("RETRY SUBMIT", 180, btn.y + 27);
 
     // Secondary Skip Button
-    const sec = LB_UI.secondary;
     ctx.fillStyle = "#2b3040";
     ctx.fillRect(sec.x, sec.y, sec.w, sec.h);
     ctx.strokeStyle = "#495057";
@@ -3197,13 +3268,27 @@ function drawTitleScreen() {
   ctx.fillText("• Beware stinky blue IKEA knock-off bags!", 180, 473);
   ctx.fillText("• Film in Influencer Zones for £1,000 bonus!", 180, 489);
 
-  if (Math.floor(Date.now() / 350) % 2 === 0) {
-    ctx.fillStyle = "#51cf66";
-    ctx.fillRect(55, 520, 250, 44);
-    ctx.fillStyle = "#000";
-    ctx.font = "bold 14px monospace";
-    ctx.fillText("TAP OR PRESS SPACE", 180, 547);
-  }
+  // Play Game Button
+  ctx.fillStyle = "#51cf66";
+  ctx.fillRect(TITLE_UI.play.x, TITLE_UI.play.y, TITLE_UI.play.w, TITLE_UI.play.h);
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(TITLE_UI.play.x, TITLE_UI.play.y, TITLE_UI.play.w, TITLE_UI.play.h);
+  ctx.fillStyle = "#000000";
+  ctx.font = "bold 13px monospace";
+  ctx.textAlign = "center";
+  ctx.fillText("▶ PLAY GAME (TAP / SPACE)", 180, TITLE_UI.play.y + 26);
+
+  // Leaderboard Button
+  ctx.fillStyle = "#201c2b";
+  ctx.fillRect(TITLE_UI.leaderboard.x, TITLE_UI.leaderboard.y, TITLE_UI.leaderboard.w, TITLE_UI.leaderboard.h);
+  ctx.strokeStyle = "#ffd43b";
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(TITLE_UI.leaderboard.x, TITLE_UI.leaderboard.y, TITLE_UI.leaderboard.w, TITLE_UI.leaderboard.h);
+  ctx.fillStyle = "#ffd43b";
+  ctx.font = "bold 11px monospace";
+  ctx.textAlign = "center";
+  ctx.fillText("🏆 VIEW LEADERBOARD [L]", 180, TITLE_UI.leaderboard.y + 24);
 }
 
 // --- MAIN LOOP ---
