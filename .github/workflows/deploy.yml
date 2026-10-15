@@ -55,17 +55,21 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug
 
+      - name: Rename APK for Distribution
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk "The Master Of Pieces.apk"
+
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: TheMasterOfPieces-Android
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: The Master Of Pieces - Android APK
+          path: The Master Of Pieces.apk
 
       - name: Setup Butler
         uses: remarkablegames/setup-butler@v2
 
       - name: Deploy APK to Itch.io Android Channel
         run: |
-          butler push android/app/build/outputs/apk/debug/app-debug.apk FlamingoTwist/the-master-of-pieces:android
+          butler push "The Master Of Pieces.apk" FlamingoTwist/the-master-of-pieces:android
         env:
           BUTLER_API_KEY: ${{ secrets.ITCH_API_KEY || secrets.BUTLER_API_KEY }}
