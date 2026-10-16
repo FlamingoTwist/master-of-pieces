@@ -3,6 +3,11 @@ name: Deploy to Itch.io
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '**.csv'
+      - '**.md'
+      - '.github/workflows/weekly-export.yml'
+      - 'scripts/**'
   workflow_dispatch:
 
 jobs:
