@@ -15,6 +15,8 @@
   }
   body, html {
     width: 100%;
+    height: 100%;
+    height: 100vh;
     height: 100dvh;
     background-color: #08080c;
     display: flex;
@@ -26,10 +28,8 @@
   }
   #game-wrapper {
     position: relative;
-    width: 100%;
-    height: 100%;
-    max-width: 450px;
-    max-height: 820px;
+    width: min(100vw, calc(100vh * 9 / 16), calc(100dvh * 9 / 16), 460px);
+    height: min(100vh, 100dvh, calc(100vw * 16 / 9), 818px);
     aspect-ratio: 9 / 16;
     background: #14141d;
     display: flex;
@@ -719,9 +719,30 @@ const touchCtrl = {
 
 function getCanvasCoords(clientX, clientY) {
   const rect = canvas.getBoundingClientRect();
+  const canvasRatio = canvas.width / canvas.height; // 360 / 640 = 0.5625
+  const elemRatio = rect.width / rect.height;
+
+  let renderW = rect.width;
+  let renderH = rect.height;
+  let offsetX = 0;
+  let offsetY = 0;
+
+  if (elemRatio > canvasRatio + 0.001) {
+    // Canvas is pillarboxed (black bars on left/right, e.g. tablets, landscape)
+    renderW = rect.height * canvasRatio;
+    offsetX = (rect.width - renderW) / 2;
+  } else if (elemRatio < canvasRatio - 0.001) {
+    // Canvas is letterboxed (black bars on top/bottom, e.g. tall phones like iPhone, Pixel 8)
+    renderH = rect.width / canvasRatio;
+    offsetY = (rect.height - renderH) / 2;
+  }
+
+  const clientXRel = clientX - rect.left - offsetX;
+  const clientYRel = clientY - rect.top - offsetY;
+
   return {
-    x: (clientX - rect.left) * (canvas.width / rect.width),
-    y: (clientY - rect.top) * (canvas.height / rect.height)
+    x: Math.max(0, Math.min(canvas.width, (clientXRel / renderW) * canvas.width)),
+    y: Math.max(0, Math.min(canvas.height, (clientYRel / renderH) * canvas.height))
   };
 }
 
@@ -729,7 +750,8 @@ function handlePointerAction(pos) {
   initAudio();
 
   if (gameState === 'TITLE') {
-    if (inRect(pos, TITLE_UI.leaderboard)) {
+    // Generous mobile thumb hit area for Leaderboard button (y >= 550, width 30 to 330)
+    if ((pos.y >= 550 && pos.x >= 30 && pos.x <= 330) || inRect(pos, TITLE_UI.leaderboard)) {
       openLeaderboardFromTitle();
     } else {
       startNewCampaign();
